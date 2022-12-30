@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 .venv
 [Bb]in
 [Ii]nclude
@@ -20,3 +21,8 @@ logs/*
 __pycache__/
 .vscode/
 >>>>>>> 125c98c (Moved .gitignore file)
+=======
+.vscode/
+.venv/
+lib/__pycache__/
+>>>>>>> 902b110 (added database class)
