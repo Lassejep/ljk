@@ -1,5 +1,5 @@
 from lib import database, encryption
 
-db = database("test.db")
+db = database("data.db")
 db.rm()
 encryption.delete_key_pair()
