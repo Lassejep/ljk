@@ -1,0 +1,6 @@
+bcrypt
+cryptography
+python-dotenv
+tk
+pyperclip
+Pillow
