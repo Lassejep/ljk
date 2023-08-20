@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as msg
 from pyperclip import copy
-from lib import encryption, utils
+from src import encryption, utils
 from os import name as os_name
 from PIL import Image, ImageTk
 
@@ -233,7 +233,7 @@ class GUI:
             print(f"User ID: {current_user_id}")
             self.login_frame.forget()
             self.main_page_widgets()
-            self.root.title("Password Manager")
+            self.root.title("LJKey")
     
     def logout(self):
         if self.ekstra_window:

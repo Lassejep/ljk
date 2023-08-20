@@ -1,4 +1,4 @@
-from lib import database, encryption, utils
+from src import database, encryption, utils
 import os
 import unittest
 

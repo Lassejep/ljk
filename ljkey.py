@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from lib import database, gui, utils
+from src import database, gui, utils
 from os import path
 
-if not path.exists("data.db"):
+if not path.exists("data.db") or not path.exists(".env"):
     utils.setup()
 
 base_dir = path.dirname(path.abspath(__file__))

@@ -1,7 +1,7 @@
 from secrets import choice
 from string import ascii_letters, digits, punctuation
-from lib import encryption
-from lib.database import Database
+from src import encryption
+from src.database import Database
 
 def generate_password(password_length: int) -> str:
     password = ''.join(choice(ascii_letters + digits + punctuation) for _ in range(password_length))
@@ -29,6 +29,7 @@ def make_test_users(database: Database, number_of_users: int, number_of_entries:
             database.add_service(website, username, encrypted_password, user_id=i+1)
 
 def setup():
+    open(".env", "a").close()
     encryption.generate_key_pair()
     db = Database("data.db")
     db.add_users_table()
