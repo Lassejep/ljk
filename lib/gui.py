@@ -10,7 +10,7 @@ class GUI:
     def __init__(self, database, icon):
         self.database = database
         self.root = tk.Tk()
-        self.root.title("My GUI")
+        self.root.title("Login")
         self.root.geometry("700x500")
         self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -233,6 +233,7 @@ class GUI:
             print(f"User ID: {current_user_id}")
             self.login_frame.forget()
             self.main_page_widgets()
+            self.root.title("Password Manager")
     
     def logout(self):
         if self.ekstra_window:
@@ -241,6 +242,7 @@ class GUI:
         print(f"{self.login_username.get()} logged out")
         self.main_page_frame.forget()
         self.login_widgets()
+        self.root.title("Login")
     
     def add_new_entry(self):
         self.add_new_entry_window()
