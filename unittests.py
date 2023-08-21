@@ -15,7 +15,9 @@ class test_encryption(unittest.TestCase):
         encryption.generate_key_pair()
         public_key = encryption.load_public_key()
         symmetrical_key = encryption.generate_symmetrical_key("secret key")
-        encrypted_symmetrical_key = encryption.encrypt_symmetrical_key(symmetrical_key)
+        encrypted_symmetrical_key = encryption.encrypt_symmetrical_key(
+            symmetrical_key
+        )
         # Check that the encrypted symmetrical key is a bytes object
         self.assertIsInstance(encrypted_symmetrical_key, bytes)
         # Check that the encrypted symmetrical key is not empty
@@ -29,8 +31,12 @@ class test_encryption(unittest.TestCase):
         public_key = encryption.load_public_key()
         private_key = encryption.load_private_key()
         symmetrical_key = encryption.generate_symmetrical_key("secret key")
-        encrypted_symmetrical_key = encryption.encrypt_symmetrical_key(symmetrical_key)
-        decrypted_symmetrical_key = encryption.decrypt_symmetrical_key(encrypted_symmetrical_key)
+        encrypted_symmetrical_key = encryption.encrypt_symmetrical_key(
+            symmetrical_key
+        )
+        decrypted_symmetrical_key = encryption.decrypt_symmetrical_key(
+            encrypted_symmetrical_key
+        )
         # Check that the decrypted symmetrical key is a bytes object
         self.assertIsInstance(decrypted_symmetrical_key, bytes)
         # Check that the decrypted symmetrical key is not empty
@@ -51,9 +57,13 @@ class test_encryption(unittest.TestCase):
     def test_verify_password(self):
         hashed_password = encryption.hash_password("password")
         # Verify the password
-        self.assertTrue(encryption.verify_password("password", hashed_password))
+        self.assertTrue(
+            encryption.verify_password("password", hashed_password)
+        )
         # Check that the wrong password is not verified
-        self.assertFalse(encryption.verify_password("notpassword", hashed_password))
+        self.assertFalse(
+            encryption.verify_password("notpassword", hashed_password)
+        )
     
     def test_generate_key(self):
         key = encryption.generate_symmetrical_key("secret key")
@@ -75,7 +85,9 @@ class test_encryption(unittest.TestCase):
     def test_decrypt_password(self):
         key = encryption.generate_symmetrical_key("secret key")
         encrypted_password = encryption.encrypt_password("password", key)
-        decrypted_password = encryption.decrypt_password(encrypted_password, key)
+        decrypted_password = encryption.decrypt_password(
+            encrypted_password, key
+        )
         # Check that the decrypted password is a string
         self.assertIsInstance(decrypted_password, str)
         # Check that the decrypted password is not empty
@@ -94,7 +106,9 @@ class test_utils(unittest.TestCase):
         self.assertEqual(len(password), 16)
     
     def test_generate_user(self):
-        username, hashed_password, symmetrical_key = utils.generate_user("test", "test")
+        username, hashed_password, symmetrical_key = utils.generate_user(
+            "test", "test"
+        )
         # check that the password has been hashed
         self.assertNotEqual(hashed_password, "test")
         # check that the password is not empty
