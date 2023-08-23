@@ -1,5 +1,6 @@
 import sqlite3
 from os import remove, path
+import websockets
 
 class Database:
     def __init__(self, database_name: str) -> None:

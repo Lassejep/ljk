@@ -4,3 +4,4 @@ python-dotenv
 tk
 pyperclip
 Pillow
+websockets
