@@ -1,14 +1,14 @@
+import asyncio
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as msg
 from pyperclip import copy
-from src import encryption, utils
 from os import name as os_name
 from PIL import Image, ImageTk
+from src import encryption, utils, events
 
 class GUI:
-    def __init__(self, database, icon):
-        self.database = database
+    def __init__(self):
         self.root = tk.Tk()
         self.root.title("Login")
         self.root.geometry("700x500")
@@ -16,7 +16,8 @@ class GUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.login_widgets()
         self.ekstra_window = False
-        self.icon = ImageTk.PhotoImage(Image.open(icon))
+        self.icon_path = "img/ljk.gif"
+        self.icon = ImageTk.PhotoImage(Image.open(self.icon_path))
         self.root.tk.call('wm', 'iconphoto', self.root._w, self.icon)
     
     def on_closing(self):
@@ -45,10 +46,10 @@ class GUI:
         self.login_password = ttk.Entry(self.login_frame, width=30, show="*")
         self.login_password.pack(pady=10)
         
-        self.login_button = ttk.Button(
+        login_button = ttk.Button(
             self.login_frame, text="Login", command=self.login
         )
-        self.login_button.pack(pady=10)
+        login_button.pack(pady=10)
         self.login_password.bind("<Return>", self.login_event)
         
         self.create_user_button = ttk.Button(
@@ -310,15 +311,17 @@ class GUI:
         self.edit_delete_button.pack(pady=2)
     
     def login(self):
-        current_user = self.database.find_user(self.login_username.get())
-        current_username = current_user["username"]
-        current_user_id = current_user["id"]
-        current_password = current_user["password_hash"]
-        if encryption.verify_password(
-            self.login_password.get(), current_password
-        ):
+        current_user = events.login_coroutine(
+            self.login_username.get(),
+            self.login_password.get()
+        )
+
+        if current_user:
             if self.ekstra_window:
                 self.close_create_user_window()
+
+            current_username = current_user["username"]
+            current_user_id = current_user["id"]
             print(f"{current_username} logged in")
             print(f"User ID: {current_user_id}")
             self.login_frame.forget()

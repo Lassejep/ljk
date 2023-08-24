@@ -156,20 +156,32 @@ class test_utils(unittest.TestCase):
         db.rm()
         encryption.delete_key_pair()
         
-    def test_setup(self):
-        utils.setup()
-        db = database("data.db")
+    def test_setup_client(self):
+        utils.setup_client()
+        # Check that the public key exists in the environment variables
+        self.assertTrue(encryption.load_public_key())
+        # Check that the private key file exists in environment variables
+        self.assertTrue(encryption.load_private_key())
+        # Check that the port exists in the environment variables
+        self.assertTrue(os.getenv("PORT"))
+        # Check that the host exists in the environment variables
+        self.assertTrue(os.getenv("HOST"))
+        utils.teardown_client()
+
+    def test_setup_server(self):
+        utils.setup_server()
+        # Check that the port exists in the environment variables
+        self.assertTrue(os.getenv("PORT"))
+        # Check that the host exists in the environment variables
+        self.assertTrue(os.getenv("HOST"))
         # Check that the database exists
-        self.assertTrue(db.database_exists())
+        self.assertTrue(os.path.exists("data.db"))
+        db = database("data.db")
         # Check that the users table exists
         self.assertTrue(db.table_exists("users"))
         # Check that the services table exists
         self.assertTrue(db.table_exists("services"))
-        # Check that the encryption key pair exists
-        self.assertTrue(encryption.load_private_key())
-        self.assertTrue(encryption.load_public_key())
         db.rm()
-        encryption.delete_key_pair()
 
 class test_database(unittest.TestCase):
     def test_create_database(self):

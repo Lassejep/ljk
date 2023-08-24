@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-
-from src import database, gui, utils
+from src import database, gui, encryption, utils
 from os import path
+from dotenv import find_dotenv, load_dotenv, get_key
+import asyncio
+import websockets
 
-if not path.exists("data.db") or not path.exists(".env"):
-    utils.setup()
+utils.setup_client()
 
-base_dir = path.dirname(path.abspath(__file__))
-icon_path = base_dir + "/img/ljk.gif"
-db = database("data.db")
-window = gui(db, icon_path)
+window = gui()
 window.run()

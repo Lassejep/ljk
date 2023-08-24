@@ -2,6 +2,8 @@ from secrets import choice
 from string import ascii_letters, digits, punctuation
 from src import encryption
 from src.database import Database
+from dotenv import find_dotenv, load_dotenv, set_key
+from os import path, remove
 
 def generate_password(password_length: int) -> str:
     password = ''.join(
@@ -43,14 +45,28 @@ def make_test_users(
                 website, username, encrypted_password, user_id=i+1
             )
 
-def setup():
-    open(".env", "a").close()
-    encryption.generate_key_pair()
-    db = Database("data.db")
-    db.add_users_table()
-    db.add_services_table()
+def setup_client():
+    if not path.exists(".env"):
+        open(".env", "a").close()
+        load_dotenv(find_dotenv())
+        encryption.generate_key_pair()
+        set_key(find_dotenv(), "PORT", "8765")
+        set_key(find_dotenv(), "HOST", "localhost")
 
-def teardown():
-    db = Database("data.db")
-    db.rm()
-    encryption.delete_key_pair()
+def teardown_client():
+    remove(".env")
+
+def setup_server():
+    if not path.exists(".env"):
+        open(".env", "a").close()
+        load_dotenv(find_dotenv())
+        set_key(find_dotenv(), "PORT", "8765")
+        set_key(find_dotenv(), "HOST", "localhost")
+    if not path.exists("data.db"):
+        database = Database("data.db")
+        database.add_users_table()
+        database.add_services_table()
+
+def teardown_server():
+    remove(".env")
+    remove("data.db")
