@@ -103,9 +103,9 @@ class Database:
         user = self.cursor.fetchone()
         if user:
             return {
-                "id": user[0], "username": user[1],
-                "password_hash": user[2],
-                "encrypted_symmetrical_key": user[3]
+                "id": user[0],
+                "username": user[1],
+                "password_hash": user[2]
             }
         else:
             return {}
