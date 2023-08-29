@@ -4,29 +4,51 @@ import json
 from dotenv import find_dotenv, get_key
 from src import encryption
 
-LOOP = asyncio.get_event_loop()
-
-async def find_user(username):
+def websocket_wrapper(func):
     env_path = find_dotenv()
     host = get_key(env_path, "HOST")
     port = get_key(env_path, "PORT")
     websocket_path = f"ws://{host}:{port}"
 
-    async with websockets.connect(websocket_path) as websocket:
-        msg = json.dumps(
-            {
-                "command": "find_user",
-                "username": username
-            }
-        )
-        await websocket.send(msg)
-        json_user = await websocket.recv()
-        return json.loads(json_user)
+    async def wrapper(*args, **kwargs):
+        async with websockets.connect(websocket_path) as websocket:
+            return await func(websocket, *args, **kwargs)
 
-def login_coroutine(username, password):
-    current_user = LOOP.run_until_complete(find_user(username))
+    return wrapper
 
-    if encryption.verify_password(password, current_user["password_hash"]):
-        return current_user
-    else:
-        return False
+@websocket_wrapper
+async def find_user(websocket, username):
+    msg = json.dumps(
+        {
+            "command": "find_user",
+            "username": username
+        }
+    )
+    await websocket.send(msg)
+    json_user = await websocket.recv()
+    return json.loads(json_user)
+
+@websocket_wrapper
+async def search_user_services(websocket, username, service_name):
+    msg = json.dumps(
+        {
+            "command": "search_user_services",
+            "username": username,
+            "service_name": service_name
+        }
+    )
+    await websocket.send(msg)
+    json_services_list = await websocket.recv()
+    return json.loads(json_services_list)
+
+@websocket_wrapper
+async def find_user_services(websocket, username):
+    msg = json.dumps(
+        {
+            "command": "find_user_services",
+            "username": username
+        }
+    )
+    await websocket.send(msg)
+    json_services_list = await websocket.recv()
+    return json.loads(json_services_list)

@@ -14,8 +14,11 @@ class GUI:
         self.root.geometry("700x500")
         self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         self.login_widgets()
         self.ekstra_window = False
+        self.loop = asyncio.get_event_loop()
+
         self.icon_path = "img/ljk.gif"
         self.icon = ImageTk.PhotoImage(Image.open(self.icon_path))
         self.root.tk.call('wm', 'iconphoto', self.root._w, self.icon)
@@ -31,76 +34,78 @@ class GUI:
         self.login_frame = ttk.Frame(self.root, padding=10)
         self.login_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.login_username_label = ttk.Label(
-            self.login_frame, text="Username:"
+        master_username_label = ttk.Label(
+            self.login_frame, text="Master Username:"
         )
-        self.login_username_label.pack(pady=2)
-        self.login_username = ttk.Entry(self.login_frame, width=30)
-        self.login_username.pack(pady=10)
-        self.login_username.focus()
+        master_username_label.pack(pady=2)
+        self.master_username = ttk.Entry(self.login_frame, width=30)
+        self.master_username.pack(pady=10)
+        self.master_username.focus()
         
-        self.login_password_label = ttk.Label(
-            self.login_frame, text="Password:"
+        master_password_label = ttk.Label(
+            self.login_frame, text="Master Password:"
         )
-        self.login_password_label.pack(pady=2)
-        self.login_password = ttk.Entry(self.login_frame, width=30, show="*")
-        self.login_password.pack(pady=10)
+        master_password_label.pack(pady=2)
+        self.master_password = ttk.Entry(self.login_frame, width=30, show="*")
+        self.master_password.pack(pady=10)
         
         login_button = ttk.Button(
             self.login_frame, text="Login", command=self.login
         )
         login_button.pack(pady=10)
-        self.login_password.bind("<Return>", self.login_event)
+        login_button.bind("<Return>", self.login_event)
+        self.master_username.bind("<Return>", self.login_event)
+        self.master_password.bind("<Return>", self.login_event)
         
-        self.create_user_button = ttk.Button(
+        create_user_button = ttk.Button(
             self.login_frame, text="Create User",
             command=self.create_user_window
         )
-        self.create_user_button.pack(pady=10)
+        create_user_button.pack(pady=10)
     
     def main_page_widgets(self):
         self.main_page_frame = ttk.Frame(self.root, padding=10)
         self.main_page_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.main_page_username_label = ttk.Label(
-            self.main_page_frame, text=f"Welcome {self.login_username.get()}"
+        main_page_username_label = ttk.Label(
+            self.main_page_frame, text=f"Welcome {self.master_username.get()}"
         )
-        self.main_page_username_label.pack(pady=10)
+        main_page_username_label.pack(pady=10)
         
-        self.add_new_entry_button = ttk.Button(
+        add_new_entry_button = ttk.Button(
             self.main_page_frame, text="Add New Entry",
             command=self.add_new_entry
         )
-        self.add_new_entry_button.pack(pady=10)
+        add_new_entry_button.pack(pady=10)
         
-        self.search_bar_label = ttk.Label(self.main_page_frame, text="Search:")
-        self.search_bar_label.pack(pady=2)
+        search_bar_label = ttk.Label(self.main_page_frame, text="Search:")
+        search_bar_label.pack(pady=2)
         self.search_bar = ttk.Entry(self.main_page_frame, width=30)
         self.search_bar.pack(pady=2)
         self.search_bar.focus()
         
-        self.table_wrapper = ttk.Frame(self.main_page_frame)
-        self.table_wrapper.pack(pady=10)
+        table_wrapper = ttk.Frame(self.main_page_frame)
+        table_wrapper.pack(pady=10)
         
-        self.table_scrollbary = ttk.Scrollbar(
-            self.table_wrapper, orient=tk.VERTICAL
+        table_scrollbary = ttk.Scrollbar(
+            table_wrapper, orient=tk.VERTICAL
         )
-        self.table_scrollbary.pack(side=tk.RIGHT, fill=tk.Y)
+        table_scrollbary.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.table_scrollbarx = ttk.Scrollbar(
-            self.table_wrapper, orient=tk.HORIZONTAL
+        table_scrollbarx = ttk.Scrollbar(
+            table_wrapper, orient=tk.HORIZONTAL
         )
-        self.table_scrollbarx.pack(side=tk.BOTTOM, fill=tk.X)
+        table_scrollbarx.pack(side=tk.BOTTOM, fill=tk.X)
         
         self.main_page_table = ttk.Treeview(
-            self.table_wrapper,
+            table_wrapper,
             columns=("Service", "Username", "Password", "Notes"),
-            yscrollcommand=self.table_scrollbary.set,
-            xscrollcommand=self.table_scrollbarx.set,
+            yscrollcommand=table_scrollbary.set,
+            xscrollcommand=table_scrollbarx.set,
             selectmode="browse"
         )
-        self.table_scrollbary.configure(command=self.main_page_table.yview)
-        self.table_scrollbarx.configure(command=self.main_page_table.xview)
+        table_scrollbary.configure(command=self.main_page_table.yview)
+        table_scrollbarx.configure(command=self.main_page_table.xview)
         self.main_page_table.heading("#0", text="ID")
         self.main_page_table.heading("#1", text="Service")
         self.main_page_table.heading("#2", text="Username")
@@ -119,10 +124,10 @@ class GUI:
         # copy password to clipboard on right click
         self.main_page_table.bind("<Button-3>", self.copy_password)
         
-        self.main_page_logout_button = ttk.Button(
+        main_page_logout_button = ttk.Button(
             self.main_page_frame, text="Logout", command=self.logout
         )
-        self.main_page_logout_button.pack(pady=10)
+        main_page_logout_button.pack(pady=10)
     
     def add_new_entry_window(self):
         self.ekstra_window = True
@@ -140,25 +145,25 @@ class GUI:
         self.add_new_entry_frame = ttk.Frame(self.new_entry_window, padding=5)
         self.add_new_entry_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.new_service_label = ttk.Label(
+        new_service_label = ttk.Label(
             self.add_new_entry_frame, text="Service"
         )
-        self.new_service_label.pack(pady=2)
+        new_service_label.pack(pady=2)
         self.new_service = ttk.Entry(self.add_new_entry_frame, width=30)
         self.new_service.pack(pady=2)
         self.new_service.focus()
         
-        self.new_username_label = ttk.Label(
+        new_username_label = ttk.Label(
             self.add_new_entry_frame, text="Username"
         )
-        self.new_username_label.pack(pady=2)
+        new_username_label.pack(pady=2)
         self.new_username = ttk.Entry(self.add_new_entry_frame, width=30)
         self.new_username.pack(pady=2)
         
-        self.new_password_label = ttk.Label(
+        new_password_label = ttk.Label(
             self.add_new_entry_frame, text="Password"
         )
-        self.new_password_label.pack(pady=2)
+        new_password_label.pack(pady=2)
         self.new_password = ttk.Entry(self.add_new_entry_frame, width=30)
         self.new_password.pack(pady=2)
         
@@ -168,10 +173,10 @@ class GUI:
         )
         self.generate_password_button.pack(pady=2)
 
-        self.new_notes_label = ttk.Label(
+        new_notes_label = ttk.Label(
             self.add_new_entry_frame, text="Notes"
         )
-        self.new_notes_label.pack(pady=2)
+        new_notes_label.pack(pady=2)
         self.new_notes = ttk.Entry(self.add_new_entry_frame, width=30)
         self.new_notes.pack(pady=2)
         
@@ -199,27 +204,27 @@ class GUI:
         )
         self.create_user_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.create_username_label = ttk.Label(
+        create_username_label = ttk.Label(
             self.create_user_frame, text="Username"
         )
-        self.create_username_label.pack(pady=2)
+        create_username_label.pack(pady=2)
         self.create_username = ttk.Entry(self.create_user_frame, width=30)
         self.create_username.pack(pady=2)
         self.create_username.focus()
         
-        self.create_password_label = ttk.Label(
+        create_password_label = ttk.Label(
             self.create_user_frame, text="Password"
         )
-        self.create_password_label.pack(pady=2)
+        create_password_label.pack(pady=2)
         self.create_password = ttk.Entry(
             self.create_user_frame, width=30, show="*"
         )
         self.create_password.pack(pady=2)
         
-        self.create_confirm_password_label = ttk.Label(
+        create_confirm_password_label = ttk.Label(
             self.create_user_frame, text="Confirm Password"
         )
-        self.create_confirm_password_label.pack(pady=2)
+        create_confirm_password_label.pack(pady=2)
         self.create_confirm_password = ttk.Entry(
             self.create_user_frame, width=30, show="*"
         )
@@ -262,27 +267,27 @@ class GUI:
         self.edit_entry_frame = ttk.Frame(self.edit_entry_window, padding=5)
         self.edit_entry_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.edit_service_label = ttk.Label(
+        edit_service_label = ttk.Label(
             self.edit_entry_frame, text=f"Editing {edit_service}"
         )
-        self.edit_service_label.pack(pady=2)
+        edit_service_label.pack(pady=2)
         self.edit_service = ttk.Entry(self.edit_entry_frame, width=30)
         self.edit_service.insert(0, edit_service)
         self.edit_service.pack(pady=2)
         self.edit_service.focus()
         
-        self.edit_username_label = ttk.Label(
+        edit_username_label = ttk.Label(
             self.edit_entry_frame, text="Username"
         )
-        self.edit_username_label.pack(pady=2)
+        edit_username_label.pack(pady=2)
         self.edit_username = ttk.Entry(self.edit_entry_frame, width=30)
         self.edit_username.insert(0, edit_username)
         self.edit_username.pack(pady=2)
         
-        self.edit_password_label = ttk.Label(
+        edit_password_label = ttk.Label(
             self.edit_entry_frame, text="Password"
         )
-        self.edit_password_label.pack(pady=2)
+        edit_password_label.pack(pady=2)
         self.edit_password = ttk.Entry(self.edit_entry_frame, width=30)
         self.edit_password.insert(0, edit_password)
         self.edit_password.pack(pady=2)
@@ -293,8 +298,8 @@ class GUI:
         )
         self.edit_generate_password_button.pack(pady=2)
         
-        self.edit_notes_label = ttk.Label(self.edit_entry_frame, text="Notes")
-        self.edit_notes_label.pack(pady=2)
+        edit_notes_label = ttk.Label(self.edit_entry_frame, text="Notes")
+        edit_notes_label.pack(pady=2)
         self.edit_notes = ttk.Entry(self.edit_entry_frame, width=30)
         self.edit_notes.insert(0, edit_notes)
         self.edit_notes.pack(pady=2)
@@ -311,14 +316,16 @@ class GUI:
         self.edit_delete_button.pack(pady=2)
     
     def login(self):
-        current_user = events.login_coroutine(
-            self.login_username.get(),
-            self.login_password.get()
+        current_user = self.loop.run_until_complete(
+            events.find_user(self.master_username.get())
         )
 
-        if current_user:
-            if self.ekstra_window:
-                self.close_create_user_window()
+        if (
+            encryption.verify_password(
+                self.master_password.get(), current_user["master_password_hash"]
+            )
+            and not self.ekstra_window
+        ):
 
             current_username = current_user["username"]
             current_user_id = current_user["id"]
@@ -327,12 +334,15 @@ class GUI:
             self.login_frame.forget()
             self.main_page_widgets()
             self.root.title("LJKey")
+
+        elif self.ekstra_window:
+            print("close the other window first")
     
     def logout(self):
         if self.ekstra_window:
             self.close_add_new_entry_window()
             self.close_edit_entry_window()
-        print(f"{self.login_username.get()} logged out")
+        print(f"{self.master_username.get()} logged out")
         self.main_page_frame.forget()
         self.login_widgets()
         self.root.title("Login")
@@ -341,20 +351,14 @@ class GUI:
         self.add_new_entry_window()
         
     def add_entry(self):
-        encrypted_symmetrical_key = self.database.find_user(
-            self.login_username.get()
-        )["encrypted_symmetrical_key"]
-        symmetrical_key = encryption.decrypt_symmetrical_key(
-            encrypted_symmetrical_key
-        )
-        encrypted_password = encryption.encrypt_password(
-            self.new_password.get(), symmetrical_key
+        encrypted_service_password = encryption.encrypt_password(
+            self.new_password.get()
         )
         
-        user_id = self.database.find_user(self.login_username.get())["id"]
+        user_id = self.database.find_user(self.master_username.get())["id"]
         self.database.add_service(
             self.new_service.get(), self.new_username.get(),
-            encrypted_password, self.new_notes.get(), user_id=user_id
+            encrypted_service_password, self.new_notes.get(), user_id=user_id
         )
         self.database.commit()
         print("new entry added")
@@ -388,13 +392,9 @@ class GUI:
         password = self.create_password.get()
         confirm_password = self.create_confirm_password.get()
         if password == confirm_password:
-            password_hash = encryption.hash_password(password)
-            symmetrical_key = encryption.generate_symmetrical_key(password)
-            encrypted_symmetrical_key = encryption.encrypt_symmetrical_key(
-                symmetrical_key
-            )
+            master_password_hash = encryption.hash_password(password)
             self.database.add_user(
-                username, password_hash, encrypted_symmetrical_key
+                username, master_password_hash
             )
             self.database.commit()
             print("user created")
@@ -404,22 +404,22 @@ class GUI:
     
     def fill_table(self, search=None):
         self.main_page_table.delete(*self.main_page_table.get_children())
-        current_user = self.login_username.get()
+        username = self.master_username.get()
         search = self.search_bar.get()
         if search:
+            # TODO: see if this is necessary
             self.main_page_table.delete(*self.main_page_table.get_children())
-            services = self.database.search_user_services(current_user, search)
-        else:
-            services = self.database.find_user_services(current_user)
-        for service in services:
-            encrypted_symmetrical_key = self.database.find_user(
-                current_user
-            )["encrypted_symmetrical_key"]
-            symmetrical_key = encryption.decrypt_symmetrical_key(
-                encrypted_symmetrical_key
+            services = self.loop.run_until_complete(
+                events.search_user_services(username, search)
             )
+        else:
+            services = self.loop.run_until_complete(
+                events.find_user_services(username)
+            )
+        for service in services:
             service["decrypted_password"] = encryption.decrypt_password(
-                service["encrypted_password"], symmetrical_key
+                service["encrypted_service_password"],
+                self.master_password.get()
             )
             self.main_page_table.insert(
                 "", "end", text=service["service_id"],
@@ -430,20 +430,16 @@ class GUI:
             )
         
     def edit_entry(self):
-        current_user = self.database.find_user(self.login_username.get())
-        encrypted_symmetrical_key = current_user["encrypted_symmetrical_key"]
+        current_user = self.database.find_user(self.master_username.get())
         user_id = current_user["id"]
         
-        symmetrical_key = encryption.decrypt_symmetrical_key(
-            encrypted_symmetrical_key
-        )
-        encrypted_password = encryption.encrypt_password(
-            self.edit_password.get(), symmetrical_key
+        encrypted_service_password = encryption.encrypt_password(
+            self.edit_password.get()
         )
         
         self.database.update_service(
             self.edit_service_id, self.edit_service.get(),
-            self.edit_username.get(), encrypted_password,
+            self.edit_username.get(), encrypted_service_password,
             self.edit_notes.get(), user_id
         )
         if msg.askokcancel("Edit", "Are you sure you want to edit this entry?"):

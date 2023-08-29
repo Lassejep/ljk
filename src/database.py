@@ -1,6 +1,5 @@
 import sqlite3
 from os import remove, path
-import websockets
 
 class Database:
     def __init__(self, database_name: str) -> None:
@@ -37,8 +36,7 @@ class Database:
             """CREATE TABLE IF NOT EXISTS users(
                     id INTEGER PRIMARY KEY,
                     username TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    encrypted_symmetrical_key BYTES NOT NULL
+                    master_password_hash TEXT NOT NULL,
             )"""
         )
         
@@ -48,7 +46,7 @@ class Database:
                     service_id INTEGER PRIMARY KEY,
                     service TEXT,
                     username TEXT,
-                    encrypted_password BYTES,
+                    encrypted_service_password BYTES,
                     notes TEXT,
                     user_id INTEGER,
                     FOREIGN KEY (user_id) REFERENCES users (id)
@@ -63,26 +61,25 @@ class Database:
         return self.cursor.fetchone()
 
     def add_user(
-        self, username: str, password_hash: str,
-        encrypted_symmetrical_key: bytes
+        self, username: str, master_password_hash: str,
     ) -> None:
         self.cursor.execute(
             f"INSERT INTO users"
-            f"(username, password_hash, encrypted_symmetrical_key)"
-            f"VALUES (?, ?, ?)", (
-                username, password_hash, encrypted_symmetrical_key
+            f"(username, master_password_hash)"
+            f"VALUES (?, ?)", (
+                username, master_password_hash
             )
         )
         
     def add_service(
-        self, service: str, username: str, encrypted_password: bytes,
+        self, service: str, username: str, encrypted_service_password: bytes,
         notes: str = "", user_id: int = 0
     ) -> None:
         self.cursor.execute(
             f"INSERT INTO services"
-            f"(service, username, encrypted_password, notes, user_id)"
+            f"(service, username, encrypted_service_password, notes, user_id)"
             f"VALUES (?, ?, ?, ?, ?)", (
-                service, username, encrypted_password, notes, user_id
+                service, username, encrypted_service_password, notes, user_id
             )
         )
 
@@ -105,7 +102,7 @@ class Database:
             return {
                 "id": user[0],
                 "username": user[1],
-                "password_hash": user[2]
+                "master_password_hash": user[2]
             }
         else:
             return {}
@@ -119,9 +116,11 @@ class Database:
             services = self.cursor.fetchall()
             services_list = []
             for service in services:
+                print(service)
                 services_list.append({
                     "service_id": service[0], "service": service[1],
-                    "username": service[2], "encrypted_password": service[3],
+                    "username": service[2],
+                    "encrypted_service_password": str(service[3]),
                     "notes": service[4], "user_id": service[5]
                 })
             return services_list
@@ -145,7 +144,7 @@ class Database:
                         "service_id": service[0],
                         "service": service[1],
                         "username": service[2],
-                        "encrypted_password": service[3],
+                        "encrypted_service_password": str(service[3]),
                         "notes": service[4],
                         "user_id": service[5]
                     })
@@ -160,7 +159,8 @@ class Database:
         if service:
             return {
                 "service_id": service[0], "service": service[1],
-                "username": service[2], "encrypted_password": service[3],
+                "username": service[2],
+                "encrypted_service_password": str(service[3]),
                 "notes": service[4], "user_id": service[5]
             }
         else:
@@ -172,21 +172,26 @@ class Database:
             (new_username, username)
         )
     
-    def update_user_password(self, username: str, password_hash: str) -> None:
+    def update_user_password(
+        self, username: str, master_password_hash: str
+    ) -> None:
         self.cursor.execute(
-            f"UPDATE users SET password_hash = ? WHERE username = ?",
-            (password_hash, username)
+            f"UPDATE users SET master_password_hash = ? WHERE username = ?",
+            (master_password_hash, username)
         )
     
     def update_service(
         self, service_id: int, service: str, username: str,
-        encrypted_password: bytes, notes: str, user_id: int
+        encrypted_service_password: bytes, notes: str, user_id: int
     ) -> None:
         self.cursor.execute(
             f"UPDATE services SET service = ?, username = ?,"
-            f"encrypted_password = ?, notes = ?"
+            f"encrypted_service_password = ?, notes = ?"
             f"WHERE service_id = ? AND user_id = ?",
-            (service, username, encrypted_password, notes, service_id, user_id)
+            (
+                service, username, encrypted_service_password,
+                notes, service_id, user_id
+            )
         )
     
     def count_table(self, table_name: str) -> int:

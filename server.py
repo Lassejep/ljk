@@ -13,7 +13,6 @@ PORT = get_key(ENV_PATH, "PORT")
 
 db = Database("data.db")
 
-# Setup websockets
 async def handler(websocket, path):
     async for json_msg in websocket:
         msg = json.loads(json_msg)
@@ -21,11 +20,29 @@ async def handler(websocket, path):
             case "connect":
                 print(f"{HOST}:{PORT} < Connected")
                 await websocket.send(f"{HOST}:{PORT} > Connected")
+
             case "find_user":
                 username = msg["username"]
                 print(f"{HOST}:{PORT} < find_user {username}")
                 user = db.find_user(username)
                 await websocket.send(json.dumps(user))
+
+            case "search_user_services":
+                username = msg["username"]
+                service_name = msg["service_name"]
+                print(
+                    f"{HOST}:{PORT} < "
+                    f"search_user_services {username} {service_name}"
+                )
+                service_list = db.search_user_services(username, service_name)
+                await websocket.send(json.dumps(service_list))
+
+            case "find_user_services":
+                username = msg["username"]
+                print(f"{HOST}:{PORT} < find_user_services {username}")
+                service_list = db.find_user_services(username)
+                await websocket.send(json.dumps(service_list, indent=4))
+
             case _:
                 print(f"{HOST}:{PORT} < Unknown Command {command}")
                 await websocket.send(f"{HOST}:{PORT} > Unknown Command")

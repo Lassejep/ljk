@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-from src import database, gui, encryption, utils
-from os import path
-from dotenv import find_dotenv, load_dotenv, get_key
-import asyncio
-import websockets
+from src.utils import setup_client
+from src import gui
 
-utils.setup_client()
+setup_client()
 
 window = gui()
 window.run()
