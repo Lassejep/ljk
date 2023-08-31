@@ -4,6 +4,13 @@ import json
 from dotenv import find_dotenv, get_key
 from src import encryption
 
+def generate_password():
+    password = ''.join(
+        choice(ascii_letters + digits + punctuation)
+        for _ in range(password_length)
+    )
+    return password
+
 def websocket_wrapper(func):
     env_path = find_dotenv()
     host = get_key(env_path, "HOST")

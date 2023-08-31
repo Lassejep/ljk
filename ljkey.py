@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-from src.utils import setup_client
-from src import gui
+from os import path
+from dotenv import load_dotenv, find_dotenv, set_key
+from src import gui, encryption
 
-setup_client()
+if not path.exists(".env"):
+    open(".env", "a").close()
+    load_dotenv(find_dotenv())
+    encryption.generate_key_pair()
+    set_key(find_dotenv(), "PORT", "8765")
+    set_key(find_dotenv(), "HOST", "localhost")
 
 window = gui()
 window.run()

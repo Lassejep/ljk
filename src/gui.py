@@ -5,7 +5,7 @@ from tkinter import messagebox as msg
 from pyperclip import copy
 from os import name as os_name
 from PIL import Image, ImageTk
-from src import encryption, utils, events
+from src import encryption, events
 
 class GUI:
     def __init__(self):
@@ -381,11 +381,11 @@ class GUI:
         
     def generate_password(self):
         self.new_password.delete(0, tk.END)
-        self.new_password.insert(0, utils.generate_password(16))
+        self.new_password.insert(0, events.generate_password(16))
     
     def generate_edit_password(self):
         self.edit_password.delete(0, tk.END)
-        self.edit_password.insert(0, utils.generate_password(16))
+        self.edit_password.insert(0, events.generate_password(16))
     
     def create_user(self):
         username = self.create_username.get()
