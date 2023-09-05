@@ -24,38 +24,39 @@ def websocket_wrapper(func):
     return wrapper
 
 @websocket_wrapper
-async def find_user(websocket, username):
+async def create_user(websocket, email, master_password):
+    verification_key = encryption.hash_password(master_password)
+    salt = encryption.generate_salt()
+    master_key = encryption.generate_key(master_password, salt)
+    vault_key = encryption.generate_random_key()
+    encrypted_vault_key = encryption.encrypt_key(master_key, vault_key)
+
     msg = json.dumps(
         {
-            "command": "find_user",
-            "username": username
+            "command": "create_user",
+            "email": email,
         }
     )
     await websocket.send(msg)
-    json_user = await websocket.recv()
-    return json.loads(json_user)
+    await websocket.send(salt)
+    await websocket.send(verification_key)
+    await websocket.send(encrypted_vault_key)
+    reply = await websocket.recv()
+    return reply
 
 @websocket_wrapper
-async def search_user_services(websocket, username, service_name):
+async def verify_user(websocket, email, master_password):
     msg = json.dumps(
         {
-            "command": "search_user_services",
-            "username": username,
-            "service_name": service_name
+            "command": "get_verification_key",
+            "email": email
         }
     )
     await websocket.send(msg)
-    json_services_list = await websocket.recv()
-    return json.loads(json_services_list)
-
-@websocket_wrapper
-async def find_user_services(websocket, username):
-    msg = json.dumps(
-        {
-            "command": "find_user_services",
-            "username": username
-        }
-    )
-    await websocket.send(msg)
-    json_services_list = await websocket.recv()
-    return json.loads(json_services_list)
+    verification_key = await websocket.recv()
+    print(f"verification_key_type: {type(verification_key)}")
+    if not verification_key:
+        return False
+    if not encryption.verify_password(master_password, verification_key):
+        return False
+    return True

@@ -6,7 +6,6 @@ from src import gui, encryption
 if not path.exists(".env"):
     open(".env", "a").close()
     load_dotenv(find_dotenv())
-    encryption.generate_key_pair()
     set_key(find_dotenv(), "PORT", "8765")
     set_key(find_dotenv(), "HOST", "localhost")
 
