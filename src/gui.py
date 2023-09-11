@@ -347,16 +347,11 @@ class GUI:
         self.add_new_service_window()
         
     def add_service(self):
-        encrypted_service_password = encryption.encrypt_password(
-            self.new_password.get()
-        )
-        
-        user_id = self.database.find_user(self.master_email.get())["id"]
-        self.database.add_service(
+        self.vault.add_service(
             self.new_service.get(), self.new_username.get(),
-            encrypted_service_password, self.new_notes.get(), user_id=user_id
+            self.new_password.get(), self.new_notes.get()
         )
-        self.database.commit()
+        self.vault.commit()
         print("new service added")
         
         self.main_page_table.delete(*self.main_page_table.get_children())
@@ -403,20 +398,16 @@ class GUI:
             # TODO: see if this is necessary
             self.main_page_table.delete(*self.main_page_table.get_children())
             services = self.loop.run_until_complete(
-                events.search_user_services(email, search)
+                self.vault.search_services(search)
             )
         else:
             services = self.vault.get_services()
         for service in services:
-            service["decrypted_password"] = encryption.decrypt_password(
-                service["encrypted_service_password"],
-                self.master_password.get()
-            )
             self.main_page_table.insert(
                 "", "end", text=service["service_id"],
                 values=(
                     service["service"], service["username"],
-                    service["decrypted_password"], service["notes"]
+                    service["password"], service["notes"]
                 )
             )
         

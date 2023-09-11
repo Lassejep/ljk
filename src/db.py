@@ -8,12 +8,15 @@ class Vault:
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
                 service_id INTEGER PRIMARY KEY,
-                sefvice TEXT,
+                service TEXT,
                 username TEXT,
                 password TEXT,
                 notes TEXT
             )"""
         )
+
+    def commit(self):
+        self.connection.commit()
 
     def add_service(
         self, service, username, password, notes = ""
