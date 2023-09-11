@@ -3,8 +3,8 @@ import sqlite3
 class Vault:
     def __init__(self, user_id):
         self.user_id = user_id
-        self.connection = sqlite3.connect(f"vault_{self.user_id}.db")
-        self.cursor = self.conn.cursor()
+        self.connection = sqlite3.connect(f"TEMP/vault_{user_id}.db")
+        self.cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
                 service_id INTEGER PRIMARY KEY,

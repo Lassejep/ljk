@@ -322,6 +322,12 @@ class GUI:
             self.master_email.get(), self.master_password.get()
         )):
             print(f"{self.master_email.get()} logged in")
+            self.vault = self.loop.run_until_complete(
+                events.get_vault(
+                    self.master_email.get(),
+                    self.master_password.get()
+                )
+            )
             self.login_frame.forget()
             self.main_page_widgets()
             self.root.title("LJKey")
@@ -385,10 +391,9 @@ class GUI:
             reply = self.loop.run_until_complete(
                 events.create_user(email, master_password)
             )
-            print(reply)
             self.close_create_user_window()
         else:
-            print("passwords do not match")
+            raise Exception("Passwords do not match")
     
     def fill_table(self, search=None):
         self.main_page_table.delete(*self.main_page_table.get_children())
@@ -401,9 +406,7 @@ class GUI:
                 events.search_user_services(email, search)
             )
         else:
-            services = self.loop.run_until_complete(
-                events.find_user_services(email)
-            )
+            services = self.vault.get_services()
         for service in services:
             service["decrypted_password"] = encryption.decrypt_password(
                 service["encrypted_service_password"],

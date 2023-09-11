@@ -13,7 +13,7 @@ def verify_password(password, hash):
     return checkpw(password.encode(), hash)
 
 def generate_random_key():
-    return urandom(256)
+    return urandom(32)
 
 def generate_salt():
     return urandom(32)
@@ -28,7 +28,7 @@ def generate_key(password, salt):
     )
     return kdf.derive(password.encode())
 
-def encrypt_key(key, plaintext):
+def encrypt(key, plaintext):
     iv = urandom(16)
     cipher = Cipher(
         algorithms.AES(key),
@@ -40,7 +40,7 @@ def encrypt_key(key, plaintext):
     padded_plaintext = padder.update(plaintext) + padder.finalize()
     return iv + encryptor.update(padded_plaintext) + encryptor.finalize()
 
-def decrypt_key(key, ciphertext):
+def decrypt(key, ciphertext):
     iv = ciphertext[:16]
     cipher = Cipher(
         algorithms.AES(key),
@@ -49,5 +49,18 @@ def decrypt_key(key, ciphertext):
     )
     decryptor = cipher.decryptor()
     unpadder = padding_symmetric.PKCS7(256).unpadder()
-    padded_plaintext = decryptor.update(ciphertext[32:]) + decryptor.finalize()
+    padded_plaintext = decryptor.update(ciphertext[16:]) + decryptor.finalize()
     return unpadder.update(padded_plaintext) + unpadder.finalize()
+
+def encrypt_file(key, filepath):
+    with open(filepath, "rb") as f:
+        plaintext = f.read()
+    ciphertext = encrypt(key, plaintext)
+    return ciphertext
+
+def decrypt_file(key, filepath):
+    with open(filepath, "rb") as f:
+        ciphertext = f.read()
+    plaintext = decrypt(key, ciphertext)
+    with open(filepath, "wb") as f:
+        f.write(plaintext)
