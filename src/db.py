@@ -1,4 +1,5 @@
 import sqlite3
+from os import remove
 
 class Vault:
     def __init__(self, user_id):
@@ -17,6 +18,11 @@ class Vault:
 
     def commit(self):
         self.connection.commit()
+
+    def rm(self):
+        self.cursor.close()
+        self.connection.close()
+        remove(f"TEMP/vault_{self.user_id}.db")
 
     def add_service(
         self, service, username, password, notes = ""

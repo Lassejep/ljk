@@ -16,6 +16,7 @@ class GUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.login_widgets()
+        self.vault = None
         self.ekstra_window = False
         self.loop = asyncio.get_event_loop()
 
@@ -25,6 +26,14 @@ class GUI:
     
     def on_closing(self):
         if msg.askokcancel("Quit", "Do you want to quit?"):
+            if self.vault:
+                self.vault.commit()
+                self.loop.run_until_complete(events.update_vault(
+                    self.master_email.get(),
+                    self.master_password.get(),
+                    self.vault
+                ))
+                self.vault.rm()
             self.root.destroy()
     
     def run(self):
@@ -397,9 +406,7 @@ class GUI:
         if search:
             # TODO: see if this is necessary
             self.main_page_table.delete(*self.main_page_table.get_children())
-            services = self.loop.run_until_complete(
-                self.vault.search_services(search)
-            )
+            services = self.vault.search_services(search)
         else:
             services = self.vault.get_services()
         for service in services:
