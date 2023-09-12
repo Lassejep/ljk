@@ -3,8 +3,10 @@ import websockets
 import json
 from dotenv import find_dotenv, get_key
 from src import encryption, db
+from random import choice
+from string import ascii_letters, digits, punctuation
 
-def generate_password():
+def generate_password(password_length = 16):
     password = ''.join(
         choice(ascii_letters + digits + punctuation)
         for _ in range(password_length)

@@ -302,7 +302,7 @@ class GUI:
         
         self.edit_generate_password_button = ttk.Button(
             self.edit_service_frame, text="Generate Password",
-            command=self.generate_edit_password
+            command=self.generate_password
         )
         self.edit_generate_password_button.pack(pady=2)
         
