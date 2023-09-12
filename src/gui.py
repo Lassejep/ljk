@@ -16,7 +16,7 @@ class GUI:
 
         self.login_widgets()
         self.vault = None
-        self.ekstra_window = False
+        self.ekstra_window = None
         self.loop = asyncio.get_event_loop()
 
         self.icon_path = "img/ljk.gif"
@@ -25,14 +25,8 @@ class GUI:
     
     def on_closing(self):
         if msg.askokcancel("Quit", "Do you want to quit?"):
-            if self.vault:
-                self.vault.commit()
-                self.loop.run_until_complete(events.update_vault(
-                    self.master_email.get(),
-                    self.master_password.get(),
-                    self.vault
-                ))
-                self.vault.rm()
+            if self.vault is not None:
+                self.logout()
             self.root.destroy()
     
     def run(self):
@@ -137,19 +131,21 @@ class GUI:
         main_page_logout_button.pack(pady=10)
     
     def add_new_service_window(self):
-        self.ekstra_window = True
         self.new_service_window = tk.Toplevel(self.root)
+        self.ekstra_window = self.new_service_window
         self.new_service_window.title("Add New Entry")
         self.new_service_window.geometry("300x300")
         self.new_service_window.resizable(False, False)
         self.new_service_window.protocol(
-            "WM_DELETE_WINDOW", self.close_add_new_service_window
+            "WM_DELETE_WINDOW", self.close_ekstra_window
         )
         self.new_service_window.tk.call(
             'wm', 'iconphoto', self.new_service_window._w, self.icon
         )
         
-        self.add_new_service_frame = ttk.Frame(self.new_service_window, padding=5)
+        self.add_new_service_frame = ttk.Frame(
+            self.new_service_window, padding=5
+        )
         self.add_new_service_frame.pack(fill=tk.BOTH, expand=True)
         
         new_service_label = ttk.Label(
@@ -194,13 +190,13 @@ class GUI:
         self.new_service_window.bind("<Return>", self.add_service_event)
     
     def create_user_window(self):
-        self.ekstra_window = True
         self.create_new_user_window = tk.Toplevel(self.root)
+        self.ekstra_window = self.create_new_user_window
         self.create_new_user_window.title("Create User")
         self.create_new_user_window.geometry("300x300")
         self.create_new_user_window.resizable(False, False)
         self.create_new_user_window.protocol(
-            "WM_DELETE_WINDOW", self.close_create_user_window
+            "WM_DELETE_WINDOW", self.close_ekstra_window
         )
         self.create_new_user_window.tk.call(
             'wm', 'iconphoto', self.create_new_user_window._w, self.icon
@@ -244,13 +240,13 @@ class GUI:
         self.create_new_user_window.bind("<Return>", self.create_user_event)
     
     def open_edit_service_window(self, _):
-        self.ekstra_window = True
         self.edit_service_window = tk.Toplevel(self.root)
+        self.ekstra_window = self.edit_service_window
         self.edit_service_window.title("Edit Entry")
         self.edit_service_window.geometry("300x300")
         self.edit_service_window.resizable(False, False)
         self.edit_service_window.protocol(
-            "WM_DELETE_WINDOW", self.close_edit_service_window
+            "WM_DELETE_WINDOW", self.close_ekstra_window
         )
         self.edit_service_id = self.main_page_table.item(
             self.main_page_table.focus()
@@ -323,8 +319,8 @@ class GUI:
         self.edit_delete_button.pack(pady=2)
     
     def login(self):
-        if self.ekstra_window:
-            self.close_create_user_window()
+        if self.ekstra_window is not None:
+            self.close_ekstra_window()
 
         if self.loop.run_until_complete(events.verify_user(
             self.master_email.get(), self.master_password.get()
@@ -343,9 +339,8 @@ class GUI:
             raise Exception("Invalid email or password")
     
     def logout(self):
-        if self.ekstra_window:
-            self.close_add_new_service_window()
-            self.close_edit_service_window()
+        if self.ekstra_window is not None:
+            self.close_ekstra_window()
         self.vault.commit()
         self.loop.run_until_complete(events.update_vault(
             self.master_email.get(),
@@ -353,6 +348,7 @@ class GUI:
             self.vault
         ))
         self.vault.rm()
+        self.vault = None
         print(f"{self.master_email.get()} logged out")
         self.main_page_frame.forget()
         self.login_widgets()
@@ -374,20 +370,12 @@ class GUI:
         
         self.main_page_table.delete(*self.main_page_table.get_children())
         self.fill_table()
-        self.close_add_new_service_window()
+        self.close_ekstra_window()
     
-    def close_add_new_service_window(self):
-        self.new_service_window.destroy()
-        self.ekstra_window = False
-        
-    def close_create_user_window(self):
-        self.create_new_user_window.destroy()
-        self.ekstra_window = False
-        
-    def close_edit_service_window(self):
-        self.edit_service_window.destroy()
-        self.ekstra_window = False
-        
+    def close_ekstra_window(self):
+        self.ekstra_window.destroy()
+        self.ekstra_window = None
+
     def generate_password(self):
         self.new_password.delete(0, tk.END)
         self.new_password.insert(0, events.generate_password(16))
@@ -400,7 +388,7 @@ class GUI:
             reply = self.loop.run_until_complete(
                 events.create_user(email, master_password)
             )
-            self.close_create_user_window()
+            self.close_ekstra_window()
         else:
             raise Exception("Passwords do not match")
     
@@ -434,7 +422,9 @@ class GUI:
             self.edit_username.get(), encrypted_service_password,
             self.edit_notes.get(), user_id
         )
-        if msg.askokcancel("Edit", "Are you sure you want to edit this service?"):
+        if msg.askokcancel(
+            "Edit", "Are you sure you want to edit this service?"
+        ):
             self.database.commit()
             print("service edited")
         else:
@@ -443,7 +433,7 @@ class GUI:
         
         self.main_page_table.delete(*self.main_page_table.get_children())
         self.fill_table()
-        self.close_edit_service_window()
+        self.close_ekstra_window()
     
     def delete_service(self):
         self.database.delete_service(self.edit_service_id)
@@ -452,7 +442,7 @@ class GUI:
         
         self.main_page_table.delete(*self.main_page_table.get_children())
         self.fill_table()
-        self.close_edit_service_window()
+        self.close_ekstra_window()
     
     def copy_password(self, _):
         copy(self.main_page_table.item(
