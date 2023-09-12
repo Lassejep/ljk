@@ -3,7 +3,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as msg
 from pyperclip import copy
-from os import name as os_name
 from PIL import Image, ImageTk
 from src import encryption, events
 
@@ -347,6 +346,13 @@ class GUI:
         if self.ekstra_window:
             self.close_add_new_service_window()
             self.close_edit_service_window()
+        self.vault.commit()
+        self.loop.run_until_complete(events.update_vault(
+            self.master_email.get(),
+            self.master_password.get(),
+            self.vault
+        ))
+        self.vault.rm()
         print(f"{self.master_email.get()} logged out")
         self.main_page_frame.forget()
         self.login_widgets()
@@ -361,6 +367,9 @@ class GUI:
             self.new_password.get(), self.new_notes.get()
         )
         self.vault.commit()
+        self.loop.run_until_complete(events.update_vault(
+            self.master_email.get(), self.master_password.get(), self.vault
+        ))
         print("new service added")
         
         self.main_page_table.delete(*self.main_page_table.get_children())
@@ -383,10 +392,6 @@ class GUI:
         self.new_password.delete(0, tk.END)
         self.new_password.insert(0, events.generate_password(16))
     
-    def generate_edit_password(self):
-        self.edit_password.delete(0, tk.END)
-        self.edit_password.insert(0, events.generate_password(16))
-    
     def create_user(self):
         email = self.create_email.get()
         master_password = self.create_password.get()
@@ -404,8 +409,6 @@ class GUI:
         email = self.master_email.get()
         search = self.search_bar.get()
         if search:
-            # TODO: see if this is necessary
-            self.main_page_table.delete(*self.main_page_table.get_children())
             services = self.vault.search_services(search)
         else:
             services = self.vault.get_services()
