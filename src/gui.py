@@ -76,7 +76,7 @@ class GUI:
         
         add_new_service_button = ttk.Button(
             self.main_page_frame, text="Add New Entry",
-            command=self.add_new_service
+            command=self.add_new_service_window
         )
         add_new_service_button.pack(pady=10)
         
@@ -274,10 +274,10 @@ class GUI:
             self.edit_service_frame, text=f"Editing {edit_service}"
         )
         edit_service_label.pack(pady=2)
-        self.edit_service = ttk.Entry(self.edit_service_frame, width=30)
-        self.edit_service.insert(0, edit_service)
-        self.edit_service.pack(pady=2)
-        self.edit_service.focus()
+        self.edit_service_name = ttk.Entry(self.edit_service_frame, width=30)
+        self.edit_service_name.insert(0, edit_service)
+        self.edit_service_name.pack(pady=2)
+        self.edit_service_name.focus()
         
         edit_username_label = ttk.Label(
             self.edit_service_frame, text="Username"
@@ -297,7 +297,7 @@ class GUI:
         
         self.edit_generate_password_button = ttk.Button(
             self.edit_service_frame, text="Generate Password",
-            command=self.generate_password
+            command=self.generate_password_edit
         )
         self.edit_generate_password_button.pack(pady=2)
         
@@ -354,9 +354,6 @@ class GUI:
         self.login_widgets()
         self.root.title("Login")
     
-    def add_new_service(self):
-        self.add_new_service_window()
-        
     def add_service(self):
         self.vault.add_service(
             self.new_service.get(), self.new_username.get(),
@@ -379,6 +376,10 @@ class GUI:
     def generate_password(self):
         self.new_password.delete(0, tk.END)
         self.new_password.insert(0, events.generate_password(16))
+
+    def generate_password_edit(self):
+        self.edit_password.delete(0, tk.END)
+        self.edit_password.insert(0, events.generate_password(16))
     
     def create_user(self):
         email = self.create_email.get()
@@ -410,37 +411,42 @@ class GUI:
             )
         
     def edit_service(self):
-        current_user = self.database.find_user(self.master_email.get())
-        user_id = current_user["id"]
-        
-        encrypted_service_password = encryption.encrypt_password(
-            self.edit_password.get()
+        self.vault.update_service(
+            self.edit_service_id, self.edit_service_name.get(),
+            self.edit_username.get(), self.edit_password.get(),
+            self.edit_notes.get()
         )
         
-        self.database.update_service(
-            self.edit_service_id, self.edit_service.get(),
-            self.edit_username.get(), encrypted_service_password,
-            self.edit_notes.get(), user_id
-        )
         if msg.askokcancel(
             "Edit", "Are you sure you want to edit this service?"
         ):
-            self.database.commit()
+            self.vault.commit()
             print("service edited")
         else:
             print("service not edited")
-            self.database.rollback()
-        
-        self.main_page_table.delete(*self.main_page_table.get_children())
+            self.vault.rollback()
+
+        self.loop.run_until_complete(events.update_vault(
+            self.master_email.get(), self.master_password.get(), self.vault
+        ))
+
         self.fill_table()
         self.close_ekstra_window()
     
     def delete_service(self):
-        self.database.delete_service(self.edit_service_id)
-        self.database.commit()
-        print("service deleted")
+        self.vault.delete_service(self.edit_service_id)
+        if msg.askokcancel(
+            "Delete", "Are you sure you want to delete this service?"
+        ):
+            self.vault.commit()
+            print("service deleted")
+        else:
+            self.vault.rollback()
         
-        self.main_page_table.delete(*self.main_page_table.get_children())
+        self.loop.run_until_complete(events.update_vault(
+            self.master_email.get(), self.master_password.get(), self.vault
+        ))
+
         self.fill_table()
         self.close_ekstra_window()
     

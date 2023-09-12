@@ -19,6 +19,9 @@ class Vault:
     def commit(self):
         self.connection.commit()
 
+    def rollback(self):
+        self.connection.rollback()
+
     def rm(self):
         self.cursor.close()
         self.connection.close()
