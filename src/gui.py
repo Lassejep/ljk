@@ -55,9 +55,9 @@ class GUI:
             self.login_frame, text="Login", command=self.login
         )
         login_button.pack(pady=10)
-        login_button.bind("<Return>", self.login_event)
-        self.master_email.bind("<Return>", self.login_event)
-        self.master_password.bind("<Return>", self.login_event)
+        login_button.bind("<Return>", self.login)
+        self.master_email.bind("<Return>", self.login)
+        self.master_password.bind("<Return>", self.login)
         
         create_user_button = ttk.Button(
             self.login_frame, text="Create User",
@@ -131,6 +131,9 @@ class GUI:
         main_page_logout_button.pack(pady=10)
     
     def add_new_service_window(self):
+        if self.ekstra_window is not None:
+            self.close_ekstra_window()
+
         self.new_service_window = tk.Toplevel(self.root)
         self.ekstra_window = self.new_service_window
         self.new_service_window.title("Add New Entry")
@@ -172,7 +175,7 @@ class GUI:
         
         self.generate_password_button = ttk.Button(
             self.add_new_service_frame, text="Generate Password",
-            command=self.generate_password
+            command=lambda: self.generate_password(self.new_password)
         )
         self.generate_password_button.pack(pady=2)
 
@@ -187,9 +190,12 @@ class GUI:
             self.add_new_service_frame, text="Add", command=self.add_service
         )
         self.add_button.pack(pady=2)
-        self.new_service_window.bind("<Return>", self.add_service_event)
+        self.new_service_window.bind("<Return>", self.add_service)
     
     def create_user_window(self):
+        if self.ekstra_window is not None:
+            self.close_ekstra_window()
+
         self.create_new_user_window = tk.Toplevel(self.root)
         self.ekstra_window = self.create_new_user_window
         self.create_new_user_window.title("Create User")
@@ -237,9 +243,12 @@ class GUI:
             self.create_user_frame, text="Create", command=self.create_user
         )
         self.create_button.pack(pady=2)
-        self.create_new_user_window.bind("<Return>", self.create_user_event)
+        self.create_new_user_window.bind("<Return>", self.create_user)
     
     def open_edit_service_window(self, _):
+        if self.ekstra_window is not None:
+            self.close_ekstra_window()
+
         self.edit_service_window = tk.Toplevel(self.root)
         self.ekstra_window = self.edit_service_window
         self.edit_service_window.title("Edit Entry")
@@ -297,7 +306,7 @@ class GUI:
         
         self.edit_generate_password_button = ttk.Button(
             self.edit_service_frame, text="Generate Password",
-            command=self.generate_password_edit
+            command=lambda: self.generate_password(self.edit_password)
         )
         self.edit_generate_password_button.pack(pady=2)
         
@@ -311,14 +320,14 @@ class GUI:
             self.edit_service_frame, text="Edit", command=self.edit_service
         )
         self.edit_button.pack(pady=2)
-        self.edit_service_window.bind("<Return>", self.edit_service_event)
+        self.edit_service_window.bind("<Return>", self.edit_service)
         
         self.edit_delete_button = ttk.Button(
             self.edit_service_frame, text="Delete", command=self.delete_service
         )
         self.edit_delete_button.pack(pady=2)
     
-    def login(self):
+    def login(self, *args):
         if self.ekstra_window is not None:
             self.close_ekstra_window()
 
@@ -338,7 +347,7 @@ class GUI:
         else:
             raise Exception("Invalid email or password")
     
-    def logout(self):
+    def logout(self, *args):
         if self.ekstra_window is not None:
             self.close_ekstra_window()
         self.vault.commit()
@@ -354,7 +363,7 @@ class GUI:
         self.login_widgets()
         self.root.title("Login")
     
-    def add_service(self):
+    def add_service(self, *args):
         self.vault.add_service(
             self.new_service.get(), self.new_username.get(),
             self.new_password.get(), self.new_notes.get()
@@ -373,15 +382,11 @@ class GUI:
         self.ekstra_window.destroy()
         self.ekstra_window = None
 
-    def generate_password(self):
-        self.new_password.delete(0, tk.END)
-        self.new_password.insert(0, events.generate_password(16))
+    def generate_password(self, password_field):
+        password_field.delete(0, tk.END)
+        password_field.insert(0, events.generate_password(16))
 
-    def generate_password_edit(self):
-        self.edit_password.delete(0, tk.END)
-        self.edit_password.insert(0, events.generate_password(16))
-    
-    def create_user(self):
+    def create_user(self, *args):
         email = self.create_email.get()
         master_password = self.create_password.get()
         confirm_master_password = self.create_confirm_master_password.get()
@@ -410,7 +415,7 @@ class GUI:
                 )
             )
         
-    def edit_service(self):
+    def edit_service(self, *args):
         self.vault.update_service(
             self.edit_service_id, self.edit_service_name.get(),
             self.edit_username.get(), self.edit_password.get(),
@@ -433,7 +438,7 @@ class GUI:
         self.fill_table()
         self.close_ekstra_window()
     
-    def delete_service(self):
+    def delete_service(self, *args):
         self.vault.delete_service(self.edit_service_id)
         if msg.askokcancel(
             "Delete", "Are you sure you want to delete this service?"
@@ -455,15 +460,3 @@ class GUI:
             self.main_page_table.focus()
         )['values'][2])
         print("password copied to clipboard")
-    
-    def login_event(self, _):
-        self.login()
-    
-    def create_user_event(self, _):
-        self.create_user()
-    
-    def add_service_event(self, _):
-        self.add_service()
-    
-    def edit_service_event(self, _):
-        self.edit_service()
