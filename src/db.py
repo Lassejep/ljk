@@ -4,7 +4,7 @@ from os import remove
 class Vault:
     def __init__(self, user_id):
         self.user_id = user_id
-        self.connection = sqlite3.connect(f"TEMP/vault_{user_id}.db")
+        self.connection = sqlite3.connect(f"tmp/vault_{user_id}.db")
         self.cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
@@ -25,7 +25,7 @@ class Vault:
     def rm(self):
         self.cursor.close()
         self.connection.close()
-        remove(f"TEMP/vault_{self.user_id}.db")
+        remove(f"tmp/vault_{self.user_id}.db")
 
     def add_service(
         self, service, username, password, notes = ""

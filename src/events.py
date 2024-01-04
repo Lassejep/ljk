@@ -1,7 +1,6 @@
 import asyncio
 import websockets
 import json
-from dotenv import find_dotenv, get_key
 from src import encryption, db
 from random import choice
 from string import ascii_letters, digits, punctuation
@@ -14,9 +13,8 @@ def generate_password(password_length = 16):
     return password
 
 def websocket_wrapper(func):
-    env_path = find_dotenv()
-    host = get_key(env_path, "HOST")
-    port = get_key(env_path, "PORT")
+    host = 'localhost'
+    port = 8765
     websocket_path = f"ws://{host}:{port}"
 
     async def wrapper(*args, **kwargs):
@@ -46,7 +44,7 @@ async def create_user(websocket, email, master_password):
     user_id = int(await websocket.recv())
     database = db.Vault(user_id)
     encrypted_vault = encryption.encrypt_file(
-        vault_key, f"TEMP/vault_{user_id}.db"
+        vault_key, f"tmp/vault_{user_id}.db"
     )
     await websocket.send(encrypted_vault)
 
@@ -107,7 +105,7 @@ async def get_vault(websocket, email, master_password):
     await websocket.send(msg)
     encrypted_vault = await websocket.recv()
     encrypted_vault = encryption.decrypt(vault_key, encrypted_vault)
-    with open(f"TEMP/vault_{user_id}.db", "wb") as f:
+    with open(f"tmp/vault_{user_id}.db", "wb") as f:
         f.write(encrypted_vault)
     return db.Vault(user_id)
 
@@ -151,6 +149,6 @@ async def update_vault(websocket, email, master_password, vault):
     )
     await websocket.send(msg)
     encrypted_vault = encryption.encrypt_file(
-        vault_key, f"TEMP/vault_{user_id}.db"
+        vault_key, f"tmp/vault_{user_id}.db"
     )
     await websocket.send(encrypted_vault)
