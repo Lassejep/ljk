@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/tinspring/ws/ljk/.venv/bin/python
 from src import gui
 
 window = gui()
