@@ -74,7 +74,7 @@ def auth(websocket):
 
     user = pickle.loads(websocket.recv())
     print(f"Welcome {user['email']}")
-    return user
+    return user, password
 
 
 def get_vaults(websocket, uid):
@@ -88,7 +88,7 @@ def get_vaults(websocket, uid):
     return vaults
 
 
-def get_vault(websocket, user, vault_name):
+def get_vault(websocket, user, vault_name, master_password):
     msg = pickle.dumps({
         "command": "get_vault",
         "uid": user["id"],
@@ -97,7 +97,6 @@ def get_vault(websocket, user, vault_name):
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     encrypted_vault_key = response["key"]
-    master_password = getpass.getpass("Enter your master password: ")
     master_key = encryption.generate_key(master_password, user["salt"])
     vault_key = encryption.decrypt(
         master_key, encrypted_vault_key
@@ -106,6 +105,17 @@ def get_vault(websocket, user, vault_name):
     with open(f"tmp/vault_{vault_name}.db", "wb") as f:
         f.write(encrypted_vault)
     encryption.decrypt_file(vault_key, f"tmp/vault_{vault_name}.db")
+
+
+def search_service(vault, service):
+    for entry in vault:
+        if entry["service"] == service:
+            return entry
+    return None
+
+
+def split_command(command):
+    return command.split(" ", 1)
 
 
 if __name__ == "__main__":
@@ -118,9 +128,9 @@ if __name__ == "__main__":
     with connect("ws://localhost:8765") as websocket:
         if sys.argv[1] == "register":
             register(websocket)
-            user = auth(websocket)
+            user, master_pass = auth(websocket)
         elif sys.argv[1] == "auth":
-            user = auth(websocket)
+            user, master_pass = auth(websocket)
         else:
             print("Usage: ./ljkey.py [register/auth]")
             sys.exit(1)
@@ -133,8 +143,75 @@ if __name__ == "__main__":
             input("Enter the number of the vault you want to access: ")
         ) - 1
         vault_name = vaults[vault_index]
-        get_vault(websocket, user, vault_name)
+        get_vault(websocket, user, vault_name, master_pass)
         vault = db.Vault(vault_name)
         print("Vault accessed")
+
+        print("View commands with 'help'")
+        command = ""
+        while command != "exit":
+            command = input("ljkey> ").split(" ", 1)
+            if command[0] == "help":
+                print("Commands:")
+                print("add: Add a new entry to the vault")
+                print("get: Get an entry from the vault")
+                print("delete: Delete an entry from the vault")
+                print("list: List all entries in the vault")
+                print("search: Search for an entry in the vault")
+                print("exit: Exit the program")
+            elif command[0] == "add":
+                service = command[1]
+                username = input("Enter the username: ")
+                password = generate_password()
+                notes = input("Enter any notes: ")
+                vault.add_service(service, username, password, notes)
+                print("Entry added to vault")
+            elif command[0] == "get":
+                service_id = command[1]
+                entry = vault.find_service(service_id)
+                if entry:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+                else:
+                    print("Entry not found")
+            elif command[0] == "delete":
+                service_id = command[1]
+                confirmation = input(
+                    f"Are you sure you want to delete {service}? (y/n): "
+                )
+                if confirmation == "y":
+                    vault.delete_service(service_id)
+                    print("Entry deleted")
+                else:
+                    print("Entry not deleted")
+            elif command[0] == "list":
+                entries = vault.get_services()
+                if not entries:
+                    print("No entries in vault")
+                for entry in entries:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+            elif command[0] == "search":
+                service = command[1]
+                entries = vault.search_services(service)
+                if not entries:
+                    print("No services match your search")
+                for entry in entries:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+            elif command[0] == "exit":
+                print("Goodbye")
 
         websocket.close()
