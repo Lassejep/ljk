@@ -105,17 +105,108 @@ def get_vault(websocket, user, vault_name, master_password):
     with open(f"tmp/vault_{vault_name}.db", "wb") as f:
         f.write(encrypted_vault)
     encryption.decrypt_file(vault_key, f"tmp/vault_{vault_name}.db")
+    return vault_key
 
 
-def search_service(vault, service):
-    for entry in vault:
-        if entry["service"] == service:
-            return entry
-    return None
+def save_vault(websocket, user, vault, vault_key):
+    encrypted_vault = encryption.encrypt_file(
+        vault_key, f"tmp/vault_{vault.name}.db"
+    )
+    msg = pickle.dumps({
+        "command": "save_vault",
+        "uid": user["id"],
+        "vault_name": vault.name,
+        "data": encrypted_vault
+    })
+    websocket.send(msg)
+    print("Saving vault to server")
+    response = pickle.loads(websocket.recv())
+    if response["status"] == "success":
+        print("Vault saved")
+    else:
+        print("Vault not saved")
 
 
-def split_command(command):
-    return command.split(" ", 1)
+def vault_console(vault, vault_key):
+    while True:
+        command = input("ljkey> ").split(" ", 1)
+        match command[0]:
+            case "help":
+                print("Commands:")
+                print("add <service>: Add an entry to the vault")
+                print("get <service_id>: Get an entry from the vault")
+                print("delete <service_id>: Delete an entry from the vault")
+                print("search <query>: Search for a service in the vault")
+                print("list: List all entries in the vault")
+                print("clear: Clear the terminal screen")
+                print("exit: Exit the program")
+                print("help: Display this help message")
+            case "add":
+                service = command[1]
+                username = input("Enter the username: ")
+                password = generate_password()
+                notes = input("Enter any notes: ")
+                vault.add_service(service, username, password, notes)
+                vault.commit()
+                print("Entry added to vault")
+            case "get":
+                service_id = command[1]
+                entry = vault.find_service(service_id)
+                if entry:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+                    print("---------------------------\n")
+                else:
+                    print("Entry not found")
+            case "delete":
+                service_id = command[1]
+                confirmation = input(
+                    f"Are you sure you want to delete {service}? (y/n): "
+                )
+                if confirmation == "y":
+                    vault.delete_service(service_id)
+                    print("Entry deleted")
+                else:
+                    print("Entry not deleted")
+            case "list":
+                entries = vault.get_services()
+                if not entries:
+                    print("No entries in vault")
+                    continue
+                for entry in entries:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+                print("---------------------------\n")
+            case "search":
+                service = command[1]
+                entries = vault.search_services(service)
+                if not entries:
+                    print("No services match your search")
+                    continue
+                for entry in entries:
+                    print("---------------------------")
+                    print(f"ID: {entry['service_id']}")
+                    print(f"Service: {entry['service']}")
+                    print(f"Username: {entry['username']}")
+                    print(f"Password: {entry['password']}")
+                    print(f"Notes: {entry['notes']}")
+                print("---------------------------\n")
+            case "clear":
+                os.system("clear")
+            case "exit":
+                print("Goodbye")
+                vault.commit()
+                break
+            case _:
+                print("Invalid command, type 'help' for a list of commands")
 
 
 if __name__ == "__main__":
@@ -143,75 +234,13 @@ if __name__ == "__main__":
             input("Enter the number of the vault you want to access: ")
         ) - 1
         vault_name = vaults[vault_index]
-        get_vault(websocket, user, vault_name, master_pass)
+        vault_key = get_vault(websocket, user, vault_name, master_pass)
         vault = db.Vault(vault_name)
         print("Vault accessed")
 
-        print("View commands with 'help'")
-        command = ""
-        while command != "exit":
-            command = input("ljkey> ").split(" ", 1)
-            if command[0] == "help":
-                print("Commands:")
-                print("add: Add a new entry to the vault")
-                print("get: Get an entry from the vault")
-                print("delete: Delete an entry from the vault")
-                print("list: List all entries in the vault")
-                print("search: Search for an entry in the vault")
-                print("exit: Exit the program")
-            elif command[0] == "add":
-                service = command[1]
-                username = input("Enter the username: ")
-                password = generate_password()
-                notes = input("Enter any notes: ")
-                vault.add_service(service, username, password, notes)
-                print("Entry added to vault")
-            elif command[0] == "get":
-                service_id = command[1]
-                entry = vault.find_service(service_id)
-                if entry:
-                    print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
-                    print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
-                    print(f"Password: {entry['password']}")
-                    print(f"Notes: {entry['notes']}")
-                else:
-                    print("Entry not found")
-            elif command[0] == "delete":
-                service_id = command[1]
-                confirmation = input(
-                    f"Are you sure you want to delete {service}? (y/n): "
-                )
-                if confirmation == "y":
-                    vault.delete_service(service_id)
-                    print("Entry deleted")
-                else:
-                    print("Entry not deleted")
-            elif command[0] == "list":
-                entries = vault.get_services()
-                if not entries:
-                    print("No entries in vault")
-                for entry in entries:
-                    print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
-                    print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
-                    print(f"Password: {entry['password']}")
-                    print(f"Notes: {entry['notes']}")
-            elif command[0] == "search":
-                service = command[1]
-                entries = vault.search_services(service)
-                if not entries:
-                    print("No services match your search")
-                for entry in entries:
-                    print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
-                    print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
-                    print(f"Password: {entry['password']}")
-                    print(f"Notes: {entry['notes']}")
-            elif command[0] == "exit":
-                print("Goodbye")
-
+        vault_console(vault, vault_key)
+        print("Saving vault")
+        save_vault(websocket, user, vault, vault_key)
+        print("Closing connection")
+        os.remove(f"tmp/vault_{vault_name}.db")
         websocket.close()
