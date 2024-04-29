@@ -239,4 +239,4 @@ if __name__ == "__main__":
 
         vault_console(vault, vault_key)
         save_vault(websocket, user, vault, vault_key)
-        os.remove(f"tmp/vault_{vault_name}.db")
+        vault.rm()

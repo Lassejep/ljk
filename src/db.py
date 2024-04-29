@@ -10,9 +10,9 @@ class Vault:
         self.cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
-                service_id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 service TEXT,
-                username TEXT,
+                user TEXT,
                 password TEXT,
                 notes TEXT
             )"""
@@ -29,74 +29,83 @@ class Vault:
         self.connection.close()
         remove(f"tmp/vault_{self.name}.db")
 
-    def add_service(
-        self, service, username, password, notes=""
+    def add(
+        self, service="", user="", password="", notes=""
     ):
         self.cursor.execute(
             """INSERT INTO vault(
-                service, username, password, notes
+                service, user, password, notes
             ) VALUES(?, ?, ?, ?)""",
-            (service, username, password, notes)
+            (service, user, password, notes)
         )
 
-    def find_service(self, service_id):
+    def service(self, id):
         self.cursor.execute(
-            """SELECT * FROM vault WHERE service_id = ?""", (service_id,)
+            """SELECT * FROM vault WHERE id = ?""", (id,)
         )
         service = self.cursor.fetchone()
+        if not service:
+            return None
         return {
-            "service_id": service[0],
+            "id": service[0],
             "service": service[1],
-            "username": service[2],
+            "user": service[2],
             "password": service[3],
             "notes": service[4]
         }
 
-    def delete_service(self, service_id):
+    def delete(self, id):
         self.cursor.execute(
-            """DELETE FROM vault WHERE service_id = ?""", (service_id,)
+            """DELETE FROM vault WHERE id = ?""", (id,)
         )
 
-    def update_service(
-        self, service_id, service, username, password, notes=""
+    def update(
+        self, id, service, user, password, notes=""
     ):
         self.cursor.execute(
             """UPDATE vault SET
                 service = ?,
-                username = ?,
+                user = ?,
                 password = ?,
                 notes = ?
-            WHERE service_id = ?""",
-            (service, username, password, notes, service_id)
+            WHERE id = ?""",
+            (service, user, password, notes, id)
         )
 
-    def get_services(self):
+    def services(self):
         self.cursor.execute(
             """SELECT * FROM vault"""
         )
         services = self.cursor.fetchall()
         services_list = []
+        if not services:
+            return None
         for service in services:
             services_list.append({
-                "service_id": service[0],
+                "id": service[0],
                 "service": service[1],
-                "username": service[2],
+                "user": service[2],
                 "password": service[3],
                 "notes": service[4]
             })
         return services_list
 
-    def search_services(self, service):
+# TODO: Make search work properly for searcing by service OR notes.
+    def search(self, service):
+        service = f"%{service}%"
         self.cursor.execute(
-            """SELECT * FROM vault WHERE service LIKE ?""", (service,)
+            """SELECT * FROM vault WHERE service LIKE ? OR notes LIKE ?""",
+            (service, service)
         )
         services = self.cursor.fetchall()
+        if not services:
+            return None
         services_list = []
         for service in services:
             services_list.append({
-                "service_id": service[0],
+                "id": service[0],
                 "service": service[1],
-                "username": service[2],
+                "user": service[2],
                 "password": service[3],
                 "notes": service[4]
             })

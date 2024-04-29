@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 
+# TODO: Use properly secure encryption methods.
 def hash_password(password):
     return hashpw(password.encode(), gensalt())
 
