@@ -119,7 +119,6 @@ def save_vault(websocket, user, vault, vault_key):
         "data": encrypted_vault
     })
     websocket.send(msg)
-    print("Saving vault to server")
     response = pickle.loads(websocket.recv())
     if response["status"] == "success":
         print("Vault saved")
@@ -239,8 +238,5 @@ if __name__ == "__main__":
         print("Vault accessed")
 
         vault_console(vault, vault_key)
-        print("Saving vault")
         save_vault(websocket, user, vault, vault_key)
-        print("Closing connection")
         os.remove(f"tmp/vault_{vault_name}.db")
-        websocket.close()
