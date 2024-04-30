@@ -5,9 +5,19 @@ from cryptography.hazmat.primitives import padding as padding_symmetric
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from string import ascii_letters, digits, punctuation
+from random import choice
 
 
 # TODO: Use properly secure encryption methods.
+def generate_password(password_length=16):
+    password = ''.join(
+        choice(ascii_letters + digits + punctuation)
+        for _ in range(password_length)
+    )
+    return password
+
+
 def hash_password(password):
     return hashpw(password.encode(), gensalt())
 

@@ -3,33 +3,15 @@ import getpass
 import sys
 import pickle
 import os
-from random import choice
 from websockets.sync.client import connect
-from string import ascii_letters, digits, punctuation
 from src import encryption, db
 
 
-def generate_password(password_length=16):
-    password = ''.join(
-        choice(ascii_letters + digits + punctuation)
-        for _ in range(password_length)
-    )
-    return password
-
-
-def register(websocket):
-    email = input("Enter your email: ")
-    master_password = getpass.getpass("Enter a master password: ")
-    repeat_password = getpass.getpass("Repeat your master password: ")
-    if master_password != repeat_password:
-        print("Passwords do not match, please try again")
-        register(websocket)
-
-    vault_name = input("Enter a name for your vault: ")
+def register(websocket, email, master_pass, vault_name):
     command = "register"
-    auth_key = encryption.hash_password(master_password)
+    auth_key = encryption.hash_password(master_pass)
     salt = encryption.generate_salt()
-    master_key = encryption.generate_key(master_password, salt)
+    master_key = encryption.generate_key(master_pass, salt)
     vault_key = encryption.generate_random_key()
     encrypted_vault_key = encryption.encrypt(master_key, vault_key)
     db.Vault(vault_name)
@@ -49,16 +31,13 @@ def register(websocket):
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     if response["status"] == "success":
-        print("Registration successful")
+        return True
     else:
-        print("Registration failed, please try again")
-        register(websocket)
+        return False
 
 
 # TODO: Implement a better way to handle password authentication
-def auth(websocket):
-    email = input("Enter your email: ")
-    password = getpass.getpass("Enter your password: ")
+def auth(websocket, email, master_pass):
     msg = pickle.dumps({
         "command": "auth",
         "email": email,
@@ -66,15 +45,11 @@ def auth(websocket):
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     auth_key = response["auth_key"]
-    if not encryption.checkpw(password.encode(), auth_key):
-        print("Login failed, please try again")
-        auth(websocket)
+    if not encryption.checkpw(master_pass.encode(), auth_key):
+        return None
     msg = websocket.send("verified")
-    print("Login successful")
-
     user = pickle.loads(websocket.recv())
-    print(f"Welcome {user['email']}")
-    return user, password
+    return user
 
 
 def get_vaults(websocket, uid):
@@ -88,7 +63,7 @@ def get_vaults(websocket, uid):
     return vaults
 
 
-def get_vault(websocket, user, vault_name, master_password):
+def get_vault(websocket, user, vault_name, master_pass):
     msg = pickle.dumps({
         "command": "get_vault",
         "uid": user["id"],
@@ -97,7 +72,7 @@ def get_vault(websocket, user, vault_name, master_password):
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     encrypted_vault_key = response["key"]
-    master_key = encryption.generate_key(master_password, user["salt"])
+    master_key = encryption.generate_key(master_pass, user["salt"])
     vault_key = encryption.decrypt(
         master_key, encrypted_vault_key
     )
@@ -121,11 +96,12 @@ def save_vault(websocket, user, vault, vault_key):
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     if response["status"] == "success":
-        print("Vault saved")
+        return True
     else:
-        print("Vault not saved")
+        return False
 
 
+# TODO: Remove password from console and add copy to clipboard functionality
 def vault_console(vault, vault_key):
     while True:
         command = input("ljkey> ").split(" ", 1)
@@ -143,65 +119,64 @@ def vault_console(vault, vault_key):
             case "add":
                 service = command[1]
                 username = input("Enter the username: ")
-                password = generate_password()
+                password = encryption.generate_password()
                 notes = input("Enter any notes: ")
-                vault.add_service(service, username, password, notes)
+                vault.add(service, username, password, notes)
                 vault.commit()
                 print("Entry added to vault")
             case "get":
                 service_id = command[1]
-                entry = vault.find_service(service_id)
-                if entry:
-                    print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
-                    print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
-                    print(f"Password: {entry['password']}")
-                    print(f"Notes: {entry['notes']}")
-                    print("---------------------------\n")
-                else:
+                entry = vault.service(service_id)
+                if entry is None:
                     print("Entry not found")
+                    continue
+                print("---------------------------")
+                print(f"Service ID: {entry['id']}")
+                print(f"Service: {entry['service']}")
+                print(f"User: {entry['user']}")
+                print(f"Password: {entry['password']}")
+                print(f"Notes: {entry['notes']}")
+                print("---------------------------\n")
             case "delete":
                 service_id = command[1]
                 confirmation = input(
                     f"Are you sure you want to delete {service}? (y/n): "
                 )
                 if confirmation == "y":
-                    vault.delete_service(service_id)
+                    vault.delete(service_id)
                     print("Entry deleted")
                 else:
                     print("Entry not deleted")
             case "list":
-                entries = vault.get_services()
-                if not entries:
+                entries = vault.services()
+                if entries is None:
                     print("No entries in vault")
                     continue
                 for entry in entries:
                     print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
+                    print(f"Service ID: {entry['id']}")
                     print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
+                    print(f"User: {entry['user']}")
                     print(f"Password: {entry['password']}")
                     print(f"Notes: {entry['notes']}")
                 print("---------------------------\n")
             case "search":
-                service = command[1]
-                entries = vault.search_services(service)
-                if not entries:
+                query = command[1]
+                entries = vault.search(query)
+                if entries is None:
                     print("No services match your search")
                     continue
                 for entry in entries:
                     print("---------------------------")
-                    print(f"ID: {entry['service_id']}")
+                    print(f"Service ID: {entry['id']}")
                     print(f"Service: {entry['service']}")
-                    print(f"Username: {entry['username']}")
+                    print(f"User: {entry['user']}")
                     print(f"Password: {entry['password']}")
                     print(f"Notes: {entry['notes']}")
                 print("---------------------------\n")
             case "clear":
                 os.system("clear")
             case "exit":
-                print("Goodbye")
                 vault.commit()
                 break
             case _:
@@ -211,18 +186,27 @@ def vault_console(vault, vault_key):
 if __name__ == "__main__":
     if not os.path.exists("tmp"):
         os.mkdir("tmp")
-    if len(sys.argv) != 2:
-        print("Usage: ./ljkey.py [register/auth]")
-        sys.exit(1)
 
     with connect("ws://localhost:8765") as websocket:
-        if sys.argv[1] == "register":
-            register(websocket)
-            user, master_pass = auth(websocket)
-        elif sys.argv[1] == "auth":
-            user, master_pass = auth(websocket)
-        else:
-            print("Usage: ./ljkey.py [register/auth]")
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "register":
+                email = input("Enter your email: ")
+                master_pass = getpass.getpass("Enter a master password: ")
+                repeat_password = getpass.getpass(
+                    "Repeat your master password: ")
+                if master_pass != repeat_password:
+                    print("Passwords do not match, please try again")
+                    sys.exit(1)
+                vault_name = input("Enter a name for your vault: ")
+                register(websocket, email, master_pass, vault_name)
+                print("Registration complete")
+
+        print("Login")
+        email = input("Enter your email: ")
+        master_pass = getpass.getpass("Enter your password: ")
+        user = auth(websocket, email, master_pass)
+        if not user:
+            print("Invalid email or password")
             sys.exit(1)
 
         vaults = get_vaults(websocket, user["id"])
@@ -238,5 +222,10 @@ if __name__ == "__main__":
         print("Vault accessed")
 
         vault_console(vault, vault_key)
-        save_vault(websocket, user, vault, vault_key)
-        vault.rm()
+        save = save_vault(websocket, user, vault, vault_key)
+        if save:
+            print("Vault saved")
+            vault.rm()
+        else:
+            print("Failed to save vault")
+        print("Exiting program, goodbye")
