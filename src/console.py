@@ -84,3 +84,8 @@ def list_services(vault):
         print(f"User: {entry['user']}")
         print(f"Notes: {entry['notes']}")
     print("---------------------------")
+
+# TODO: Account auth and registration
+# TODO: Account Master Password change
+# TODO: Vault changes, creation, and deletion
+# TODO: Service modification
