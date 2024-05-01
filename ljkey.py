@@ -6,7 +6,6 @@ from websockets.sync.client import connect
 from src import db, handlers, console
 
 
-# TODO: Remove password from console and add copy to clipboard functionality
 def vault_console(vault, vault_key):
     while True:
         command = input("ljkey> ").split(" ", 1)
