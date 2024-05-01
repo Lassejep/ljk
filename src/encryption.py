@@ -1,15 +1,13 @@
-from bcrypt import hashpw, gensalt, checkpw
-from os import urandom
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding as padding_symmetric
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from string import ascii_letters, digits, punctuation
-from random import choice
+from secrets import choice, randbits
 
 
-# TODO: Use properly secure encryption methods.
 def generate_password(password_length=16):
     password = ''.join(
         choice(ascii_letters + digits + punctuation)
@@ -18,23 +16,30 @@ def generate_password(password_length=16):
     return password
 
 
+# TODO: Check if argon2 is implemented correctly
 def hash_password(password):
-    return hashpw(password.encode(), gensalt())
+    return PasswordHasher().hash(password)
 
 
 def verify_password(password, hash):
-    return checkpw(password.encode(), hash)
+    try:
+        return PasswordHasher().verify(hash, password)
+    except VerifyMismatchError:
+        return False
+    except Exception as e:
+        print(e)
+        return False
 
 
-def generate_random_key():
-    return urandom(32)
+def generate_vault_key():
+    return AESGCM.generate_key(bit_length=256)
 
 
 def generate_salt():
-    return urandom(32)
+    return randbits(256).to_bytes(32, "big")
 
 
-def generate_key(password, salt):
+def create_data_key(password, salt):
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -45,42 +50,31 @@ def generate_key(password, salt):
     return kdf.derive(password.encode())
 
 
-def encrypt(key, plaintext):
-    iv = urandom(16)
-    cipher = Cipher(
-        algorithms.AES(key),
-        modes.CBC(iv),
-        backend=default_backend()
-    )
-    encryptor = cipher.encryptor()
-    padder = padding_symmetric.PKCS7(256).padder()
-    padded_plaintext = padder.update(plaintext) + padder.finalize()
-    return iv + encryptor.update(padded_plaintext) + encryptor.finalize()
+def encrypt(plaintext, key, associated_data=None):
+    aesgcm = AESGCM(key)
+    nonce = randbits(96).to_bytes(12, "big")
+    ciphertext = aesgcm.encrypt(nonce, plaintext, associated_data)
+    return nonce + ciphertext
 
 
-def decrypt(key, ciphertext):
-    iv = ciphertext[:16]
-    cipher = Cipher(
-        algorithms.AES(key),
-        modes.CBC(iv),
-        backend=default_backend()
-    )
-    decryptor = cipher.decryptor()
-    unpadder = padding_symmetric.PKCS7(256).unpadder()
-    padded_plaintext = decryptor.update(ciphertext[16:]) + decryptor.finalize()
-    return unpadder.update(padded_plaintext) + unpadder.finalize()
+def decrypt(ciphertext, key, associated_data=None):
+    aesgcm = AESGCM(key)
+    nonce = ciphertext[:12]
+    ciphertext = ciphertext[12:]
+    return aesgcm.decrypt(nonce, ciphertext, associated_data)
 
 
-def encrypt_file(key, filepath):
+# TODO: Implement a better way to handle file encryption
+def encrypt_file(filepath, key):
     with open(filepath, "rb") as f:
         plaintext = f.read()
-    ciphertext = encrypt(key, plaintext)
+    ciphertext = encrypt(plaintext, key)
     return ciphertext
 
 
-def decrypt_file(key, filepath):
+def decrypt_file(filepath, key):
     with open(filepath, "rb") as f:
         ciphertext = f.read()
-    plaintext = decrypt(key, ciphertext)
+    plaintext = decrypt(ciphertext, key)
     with open(filepath, "wb") as f:
         f.write(plaintext)
