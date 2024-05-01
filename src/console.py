@@ -1,7 +1,7 @@
 from . import encryption
+import pyperclip
 
 
-# TODO: Remove password from console and add copy to clipboard functionality
 def help():
     print("Commands:")
     print("add <service>: Add an entry to the vault")
@@ -16,7 +16,11 @@ def help():
 
 def add_service(service, vault):
     username = input("Enter the username: ")
-    password = encryption.generate_password()
+    generate_password = input("Generate a password? (Y/n): ").lower()
+    if generate_password == "n" or generate_password == "no":
+        password = input("Enter the password: ")
+    else:
+        password = encryption.generate_password()
     notes = input("Enter any notes: ")
     vault.add(service, username, password, notes)
     vault.commit()
@@ -35,14 +39,18 @@ def get_service(service_id, vault):
     print(f"Password: {entry['password']}")
     print(f"Notes: {entry['notes']}")
     print("---------------------------")
+    copy = input("Copy password to clipboard? (y/N): ").lower()
+    if copy == "y" or copy == "yes":
+        pyperclip.copy(entry["password"])
+        print("Password copied to clipboard")
 
 
 def delete_service(service_id, vault):
     service = vault.service(service_id)
     confirmation = input(
-        f"Are you sure you want to delete {service['service']}? (y/n): "
-    )
-    if confirmation == "y":
+        f"Are you sure you want to delete {service['service']}? (y/N): "
+    ).lower()
+    if confirmation == "y" or confirmation == "yes":
         vault.delete(service_id)
         vault.commit()
         print("Entry deleted")
@@ -60,7 +68,6 @@ def search_service(query, vault):
         print(f"Service ID: {entry['id']}")
         print(f"Service: {entry['service']}")
         print(f"User: {entry['user']}")
-        print(f"Password: {entry['password']}")
         print(f"Notes: {entry['notes']}")
     print("---------------------------")
 
@@ -75,6 +82,5 @@ def list_services(vault):
         print(f"Service ID: {entry['id']}")
         print(f"Service: {entry['service']}")
         print(f"User: {entry['user']}")
-        print(f"Password: {entry['password']}")
         print(f"Notes: {entry['notes']}")
     print("---------------------------")
