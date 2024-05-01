@@ -1,6 +1,0 @@
-bcrypt
-cryptography
-tk
-pyperclip
-Pillow
-websockets
