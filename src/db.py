@@ -4,8 +4,9 @@ from os import remove
 
 # TODO: Make vault an in-memory database only.
 class Vault:
-    def __init__(self, name):
+    def __init__(self, name, key):
         self.name = name
+        self.key = key
         self.connection = sqlite3.connect(f"tmp/vault_{name}.db")
         self.cursor = self.connection.cursor()
         self.cursor.execute(
@@ -90,7 +91,6 @@ class Vault:
             })
         return services_list
 
-# TODO: Make search work properly for searcing by service OR notes.
     def search(self, service):
         service = f"%{service}%"
         self.cursor.execute(

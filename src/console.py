@@ -11,8 +11,6 @@ class Console:
         self.master_pass = None
         self.user = None
         self.vault = None
-        self.vault_name = None
-        self.vault_key = None
 
     def run(self):
         while True:
@@ -52,7 +50,7 @@ class Console:
                     case "ls":
                         self.vault_list()
                     case "select":
-                        self.vault_select()
+                        self.vault_select(command[2])
                     case "create":
                         self.vault_create()
                     case "rename":
@@ -138,7 +136,7 @@ class Console:
         if self.vault is not None:
             print("Saving vault")
             self.vault.commit()
-            handlers.save_vault(self.user, self.vault)
+            handlers.save_vault(self.ws, self.user, self.vault)
             self.vault.rm()
         print("Goodbye")
 
@@ -285,17 +283,17 @@ class Console:
             print(vault)
 
     def vault_select(self, vault_name):
-        self.vault_key = handlers.get_vault(
-            self.user, vault_name, self.master_pass
+        handlers.get_vault(
+            self.ws, self.user, vault_name, self.master_pass
         )
         self.vault = db.Vault(vault_name)
 
     def vault_create(self):
         vault_name = input("Enter the name of the new vault: ")
         db.Vault(vault_name)
-        handlers.create_vault(self.user, vault_name, self.master_pass)
+        handlers.create_vault(self.ws, self.user, vault_name, self.master_pass)
         print("Vault created")
-        handlers.get_vault(self.user, vault_name, self.master_pass)
+        handlers.get_vault(self.ws, self.user, vault_name, self.master_pass)
         self.vault = db.Vault(vault_name)
         print(f"Vault changed to {vault_name}")
 
@@ -306,7 +304,7 @@ class Console:
             print("No name entered")
             return
         self.vault.name = new_name
-        handlers.save_vault(self.ws, self.user, self.vault, self.vault_key)
+        handlers.save_vault(self.ws, self.user, self.vault)
         print("Vault renamed")
 
     def vault_delete(self):
@@ -317,7 +315,7 @@ class Console:
         if confirmation != "y" or confirmation != "yes":
             print("Vault not deleted")
             return
-        handlers.delete_vault(self.ws, self.user, self.vault, self.vault_key)
+        handlers.delete_vault(self.ws, self.user, self.vault.name)
         print("Vault deleted")
 
     def vault_info(self):
