@@ -1,10 +1,11 @@
 import unittest
-from src import db
+from src import db, encryption
 
 
 class TestVault(unittest.TestCase):
     def setUp(self):
-        self.vault = db.Vault("test")
+        self.vault_key = encryption.generate_vault_key()
+        self.vault = db.Vault("test", self.vault_key)
         self.vault.add(
             "test_service", "test_user", "test_password", "test_notes"
         )
