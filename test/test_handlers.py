@@ -1,7 +1,6 @@
 import unittest
 import os
-from src import handlers
-from src import db
+from src import db, encryption, handlers
 from websockets.sync.client import connect
 
 
@@ -14,7 +13,8 @@ class TestClient(unittest.TestCase):
         self.email = "email"
         self.master_pass = "master_pass"
         self.vault_name = "vault_name"
-        self.vault = db.Vault(self.vault_name)
+        self.vault_key = encryption.generate_vault_key()
+        self.vault = db.Vault(self.vault_name, self.vault_key)
         self.vault_path = f"tmp/vault_{self.vault_name}.db"
         self.service = "test_service"
         self.user = "test_user"
@@ -23,20 +23,20 @@ class TestClient(unittest.TestCase):
 
     def test_register(self):
         response = handlers.register(
-            self.ws, self.email, self.master_pass, self.vault_name
+            self.ws, self.email, self.master_pass, self.vault
         )
         self.assertEqual(response, True)
 
     def test_login(self):
         handlers.register(
-            self.ws, self.email, self.master_pass, self.vault_name
+            self.ws, self.email, self.master_pass, self.vault
         )
         user = handlers.auth(self.ws, self.email, self.master_pass)
         self.assertIsNotNone(user)
 
     def test_get_vaults(self):
         handlers.register(
-            self.ws, self.email, self.master_pass, self.vault_name
+            self.ws, self.email, self.master_pass, self.vault
         )
         user = handlers.auth(self.ws, self.email, self.master_pass)
         vaults = handlers.get_vaults(self.ws, user["id"])
@@ -45,7 +45,7 @@ class TestClient(unittest.TestCase):
 
     def test_get_vault(self):
         handlers.register(
-            self.ws, self.email, self.master_pass, self.vault_name
+            self.ws, self.email, self.master_pass, self.vault
         )
         os.remove(self.vault_path)
         user = handlers.auth(self.ws, self.email, self.master_pass)
@@ -57,15 +57,38 @@ class TestClient(unittest.TestCase):
 
     def test_save_vault(self):
         handlers.register(
-            self.ws, self.email, self.master_pass, self.vault_name
+            self.ws, self.email, self.master_pass, self.vault
         )
         user = handlers.auth(self.ws, self.email, self.master_pass)
         vault_key = handlers.get_vault(
             self.ws, user, self.vault_name, self.master_pass
         )
         self.vault.add(self.service, self.user, self.password, self.notes)
-        save = handlers.save_vault(self.ws, user, self.vault, vault_key)
+        save = handlers.save_vault(self.ws, user, self.vault)
         self.assertTrue(save)
+
+    def test_create_vault(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        new_vault_name = "new_vault"
+        new_vault_key = encryption.generate_vault_key()
+        new_vault = db.Vault(new_vault_name, new_vault_key)
+        handlers.create_vault(self.ws, user, new_vault, self.master_pass)
+        vaults = handlers.get_vaults(self.ws, user["id"])
+        self.assertEqual(len(vaults), 2)
+        self.assertNotEqual(vaults[0], new_vault_name)
+        self.assertEqual(vaults[1], new_vault_name)
+
+    def test_delete_vault(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        handlers.delete_vault(self.ws, user, self.vault_name)
+        vaults = handlers.get_vaults(self.ws, user["id"])
+        self.assertEqual(len(vaults), 0)
 
     def tearDown(self):
         self.vault.rm()
