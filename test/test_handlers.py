@@ -60,7 +60,7 @@ class TestClient(unittest.TestCase):
             self.ws, self.email, self.master_pass, self.vault
         )
         user = handlers.auth(self.ws, self.email, self.master_pass)
-        vault_key = handlers.get_vault(
+        handlers.get_vault(
             self.ws, user, self.vault_name, self.master_pass
         )
         self.vault.add(self.service, self.user, self.password, self.notes)
@@ -89,6 +89,51 @@ class TestClient(unittest.TestCase):
         handlers.delete_vault(self.ws, user, self.vault_name)
         vaults = handlers.get_vaults(self.ws, user["id"])
         self.assertEqual(len(vaults), 0)
+
+    def test_change_master_pass(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        new_master_pass = "new_master_pass"
+        self.vault.add(self.service, self.user, self.password, self.notes)
+        status = handlers.change_master_pass(
+            self.ws, user, self.master_pass, new_master_pass
+        )
+        self.assertTrue(status)
+        user = handlers.auth(self.ws, self.email, new_master_pass)
+        self.assertIsNotNone(user)
+
+    def test_change_email(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        new_email = "new_email"
+        status = handlers.change_email(self.ws, user, new_email)
+        self.assertTrue(status)
+        user = handlers.auth(self.ws, new_email, self.master_pass)
+        self.assertIsNotNone(user)
+
+    def test_delete_account(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        handlers.delete_account(self.ws, user)
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        self.assertIsNone(user)
+
+    def test_update_vault_key(self):
+        handlers.register(
+            self.ws, self.email, self.master_pass, self.vault
+        )
+        user = handlers.auth(self.ws, self.email, self.master_pass)
+        new_vault_key = encryption.generate_vault_key()
+        status = handlers.update_vault_key(
+            self.ws, user, self.vault_name, new_vault_key
+        )
+        self.assertTrue(status)
 
     def tearDown(self):
         self.vault.rm()
