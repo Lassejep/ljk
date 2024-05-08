@@ -39,7 +39,7 @@ async def delete_account(websocket, user):
 
 
 async def change_mkey(websocket, user, mkey, new_mkey):
-    vaults = get_vaults(websocket, user)
+    vaults = await get_vaults(websocket, user)
     for vault in vaults:
         vault_name = vault["name"]
         e_vkey = vault["key"]
@@ -47,7 +47,7 @@ async def change_mkey(websocket, user, mkey, new_mkey):
         vkey = encryption.decrypt(e_vkey, dkey)
         new_dkey = encryption.create_data_key(new_mkey, user["salt"])
         new_e_vkey = encryption.encrypt(vkey, new_dkey)
-        if not update_vault_key(websocket, user, vault_name, new_e_vkey):
+        if not await update_vault_key(websocket, user, vault_name, new_e_vkey):
             return False
     auth_key = encryption.hash_password(new_mkey)
     msg = pickle.dumps({
