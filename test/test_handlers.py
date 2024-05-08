@@ -42,10 +42,9 @@ class TestClient(unittest.TestCase):
         handlers.register(self.ws, self.email, self.mkey)
         user = handlers.auth(self.ws, self.email, self.mkey)
         handlers.create_vault(self.ws, user, self.vault, self.mkey)
-        os.remove(self.vault_path)
-        vkey = handlers.get_vault(self.ws, user, self.vault_name, self.mkey)
-        self.assertIsNotNone(vkey)
-        self.assertTrue(os.path.exists(self.vault_path))
+        self.vault.rm()
+        vault = handlers.get_vault(self.ws, user, self.vault_name, self.mkey)
+        self.assertIsNotNone(vault)
 
     def test_save_vault(self):
         handlers.register(self.ws, self.email, self.mkey)

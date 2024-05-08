@@ -1,5 +1,5 @@
 import pickle
-from . import encryption
+from . import encryption, db
 
 
 def register(websocket, email, mkey):
@@ -49,9 +49,7 @@ def change_mkey(websocket, user, mkey, new_mkey):
             return False
     auth_key = encryption.hash_password(new_mkey)
     msg = pickle.dumps({
-        "command": "change_auth_key",
-        "uid": user["id"],
-        "auth_key": auth_key
+        "command": "change_auth_key", "uid": user["id"], "auth_key": auth_key
     })
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
@@ -88,21 +86,17 @@ def get_vault(websocket, user, vault_name, mkey):
         "command": "get_vault", "uid": user["id"], "vault_name": vault_name
     })
     websocket.send(msg)
-    response = pickle.loads(websocket.recv())
+    vault = pickle.loads(websocket.recv())
     dkey = encryption.create_data_key(mkey, user["salt"])
-    e_vkey = response["key"]
-    vkey = encryption.decrypt(e_vkey, dkey)
-    e_vault = response["data"]
-    with open(f"tmp/vault_{vault_name}.db", "wb") as f:
-        f.write(e_vault)
-    encryption.decrypt_file(f"tmp/vault_{vault_name}.db", vkey)
-    return vkey
+    vkey = encryption.decrypt(vault["key"], dkey)
+    data = encryption.decrypt(vault["data"], vkey)
+    vault = db.Vault(vault_name, vkey)
+    vault.load(data)
+    return vault
 
 
 def save_vault(websocket, user, vault):
-    e_vault = encryption.encrypt_file(
-        f"tmp/vault_{vault.name}.db", vault.key
-    )
+    e_vault = encryption.encrypt(vault.dump(), vault.key)
     msg = pickle.dumps({
         "command": "save_vault",
         "uid": user["id"],
@@ -149,7 +143,7 @@ def delete_vault(websocket, user, vault_name):
 def create_vault(websocket, user, vault, mkey):
     dkey = encryption.create_data_key(mkey, user["salt"])
     e_vkey = encryption.encrypt(vault.key, dkey)
-    e_vault = encryption.encrypt_file(f"tmp/vault_{vault.name}.db", vault.key)
+    e_vault = encryption.encrypt(vault.dump(), vault.key)
     msg = pickle.dumps({
         "command": "create_vault",
         "uid": user["id"],

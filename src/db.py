@@ -1,13 +1,11 @@
 import sqlite3
-from os import remove
 
 
-# TODO: Make vault an in-memory database only.
 class Vault:
     def __init__(self, name, key):
         self.name = name
         self.key = key
-        self.connection = sqlite3.connect(f"tmp/vault_{name}.db")
+        self.connection = sqlite3.connect(":memory:")
         self.cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
@@ -28,7 +26,13 @@ class Vault:
     def rm(self):
         self.cursor.close()
         self.connection.close()
-        remove(f"tmp/vault_{self.name}.db")
+
+    def dump(self):
+        self.connection.commit()
+        return self.connection.serialize()
+
+    def load(self, data):
+        self.connection = self.connection.deserialize(data)
 
     def add(
         self, service="", user="", password="", notes=""

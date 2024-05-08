@@ -88,5 +88,18 @@ class TestVault(unittest.TestCase):
         self.assertEqual(services[0]["service"], "test_service")
         self.assertEqual(services[1]["service"], "test_service_2")
 
+    def test_dump(self):
+        data = self.vault.dump()
+        self.assertNotEqual(data, None)
+
+    def test_load(self):
+        data = self.vault.dump()
+        vault = db.Vault("test", self.vault_key)
+        self.assertNotEqual(vault.services(), self.vault.services())
+        vault.load(data)
+        self.assertEqual(vault.name, "test")
+        self.assertEqual(vault.key, self.vault_key)
+        self.assertEqual(vault.services(), self.vault.services())
+
     def tearDown(self):
         self.vault.rm()
