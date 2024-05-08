@@ -11,7 +11,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        localhost_pem = "/home/tinspring/ws/ljk/localhost.pem"
+        localhost_pem = "/home/tinspring/ws/ljk_server/localhost.pem"
         ssl_context.load_verify_locations(localhost_pem)
         self.ws = await websockets.connect(
             "wss://localhost:8765", ssl=ssl_context, ping_interval=None
