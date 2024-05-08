@@ -13,6 +13,7 @@ class Console:
         self.user = None
         self.vault = None
 
+    # TODO: Improve UX
     async def run(self):
         while True:
             prompt = "ljkey> "
@@ -333,7 +334,9 @@ class Console:
         if confirmation != "y" or confirmation != "yes":
             print("Vault not deleted")
             return
-        if not await handlers.delete_vault(self.ws, self.user, self.vault.name):
+        if not await handlers.delete_vault(
+            self.ws, self.user, self.vault.name
+        ):
             print("Failed to delete vault")
             return
         self.vault.rm()
