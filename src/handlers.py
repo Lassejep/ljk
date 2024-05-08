@@ -42,10 +42,12 @@ def change_mkey(websocket, user, mkey, new_mkey):
     vaults = get_vaults(websocket, user)
     for vault in vaults:
         vault_name = vault["name"]
-        dkey = encryption.create_data_key(new_mkey, user["salt"])
-        vkey = get_vault(websocket, user, vault_name, mkey)
-        e_vkey = encryption.encrypt(vkey, dkey)
-        if not update_vault_key(websocket, user, vault_name, e_vkey):
+        e_vkey = vault["key"]
+        dkey = encryption.create_data_key(mkey, user["salt"])
+        vkey = encryption.decrypt(e_vkey, dkey)
+        new_dkey = encryption.create_data_key(new_mkey, user["salt"])
+        new_e_vkey = encryption.encrypt(vkey, new_dkey)
+        if not update_vault_key(websocket, user, vault_name, new_e_vkey):
             return False
     auth_key = encryption.hash_password(new_mkey)
     msg = pickle.dumps({
@@ -81,6 +83,7 @@ def get_vaults(websocket, user):
     return vaults
 
 
+# TODO: Make this function return none if the vault does not exist.
 def get_vault(websocket, user, vault_name, mkey):
     msg = pickle.dumps({
         "command": "get_vault", "uid": user["id"], "vault_name": vault_name
@@ -96,13 +99,15 @@ def get_vault(websocket, user, vault_name, mkey):
 
 
 def save_vault(websocket, user, vault):
-    e_vault = encryption.encrypt(vault.dump(), vault.key)
+    vault_data = vault.dump()
+    e_vault = encryption.encrypt(vault_data, vault.key)
     msg = pickle.dumps({
         "command": "save_vault",
         "uid": user["id"],
         "vault_name": vault.name,
         "data": e_vault
     })
+    vault.load(vault_data)
     websocket.send(msg)
     response = pickle.loads(websocket.recv())
     if response["status"] == "success":
@@ -140,14 +145,16 @@ def delete_vault(websocket, user, vault_name):
         return False
 
 
-def create_vault(websocket, user, vault, mkey):
+def create_vault(websocket, user, vault_name, mkey):
+    vkey = encryption.generate_vault_key()
+    vault = db.Vault(vault_name, vkey)
     dkey = encryption.create_data_key(mkey, user["salt"])
-    e_vkey = encryption.encrypt(vault.key, dkey)
-    e_vault = encryption.encrypt(vault.dump(), vault.key)
+    e_vkey = encryption.encrypt(vkey, dkey)
+    e_vault = encryption.encrypt(vault.dump(), vkey)
     msg = pickle.dumps({
         "command": "create_vault",
         "uid": user["id"],
-        "vault_name": vault.name,
+        "vault_name": vault_name,
         "vault_key": e_vkey,
         "vault_data": e_vault
     })

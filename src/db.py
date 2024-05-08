@@ -32,7 +32,7 @@ class Vault:
         return self.connection.serialize()
 
     def load(self, data):
-        self.connection = self.connection.deserialize(data)
+        self.connection.deserialize(data)
 
     def add(
         self, service="", user="", password="", notes=""
