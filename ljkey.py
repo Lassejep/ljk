@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-import os
 import ssl
-import pathlib
 import websockets
 import asyncio
 from src import console
 
 
 async def main():
-    if not os.path.exists("tmp"):
-        os.mkdir("tmp")
-
     # TODO: Use a real certificate
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     localhost_pem = "/home/tinspring/ws/ljk_server/localhost.pem"

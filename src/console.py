@@ -15,7 +15,11 @@ class Console:
 
     async def run(self):
         while True:
-            command = input("ljkey> ").split(" ", 2)
+            prompt = "ljkey> "
+            if self.vault is not None:
+                prompt = f"ljkey/{self.vault.name}> "
+            command = input(f"{prompt}").split(" ", 2)
+
             if command[0] == "account":
                 if len(command) < 2:
                     self.account_info()
