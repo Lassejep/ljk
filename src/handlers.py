@@ -83,13 +83,15 @@ def get_vaults(websocket, user):
     return vaults
 
 
-# TODO: Make this function return none if the vault does not exist.
 def get_vault(websocket, user, vault_name, mkey):
     msg = pickle.dumps({
         "command": "get_vault", "uid": user["id"], "vault_name": vault_name
     })
     websocket.send(msg)
-    vault = pickle.loads(websocket.recv())
+    response = pickle.loads(websocket.recv())
+    if response["status"] == "failed":
+        return None
+    vault = response["vault"]
     dkey = encryption.create_data_key(mkey, user["salt"])
     vkey = encryption.decrypt(vault["key"], dkey)
     data = encryption.decrypt(vault["data"], vkey)

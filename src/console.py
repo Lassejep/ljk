@@ -287,6 +287,9 @@ class Console:
         self.vault = handlers.get_vault(
             self.ws, self.user, vault_name, self.mkey
         )
+        if self.vault is None:
+            print("Failed to select vault")
+            return
 
     def vault_create(self):
         vault_name = input("Enter the name of the new vault: ")
