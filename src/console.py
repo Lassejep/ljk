@@ -13,7 +13,7 @@ class Console:
         self.user = None
         self.vault = None
 
-    def run(self):
+    async def run(self):
         while True:
             command = input("ljkey> ").split(" ", 2)
             if command[0] == "account":
@@ -24,17 +24,17 @@ class Console:
                     case "help":
                         self.account_help()
                     case "register":
-                        self.account_register()
+                        await self.account_register()
                     case "auth":
-                        self.account_auth()
+                        await self.account_auth()
                     case "logout":
-                        self.account_logout()
+                        await self.account_logout()
                     case "delete":
-                        self.delete_account()
+                        await self.delete_account()
                     case "change-master-pass":
-                        self.account_change_master_pass()
+                        await self.account_change_master_pass()
                     case "change-email":
-                        self.account_change_email()
+                        await self.account_change_email()
                     case _:
                         print("Invalid command")
                         self.account_help()
@@ -49,15 +49,17 @@ class Console:
                     case "help":
                         self.vault_help()
                     case "ls":
-                        self.vault_list()
+                        await self.vault_list()
                     case "select":
-                        self.vault_select(command[2])
+                        await self.vault_select(command[2])
                     case "create":
-                        self.vault_create()
+                        await self.vault_create()
                     case "rename":
-                        self.vault_rename()
+                        await self.vault_rename()
                     case "delete":
-                        self.vault_delete()
+                        await self.vault_delete()
+                    case "save":
+                        await self.vault_save()
                     case _:
                         print("Invalid command")
                         self.vault_help()
@@ -84,6 +86,8 @@ class Console:
                         self.service_edit(command[1])
                     case "delete":
                         self.service_delete(command[1])
+                    case "save":
+                        await self.vault_save()
                     case "exit":
                         break
                     case "quit":
@@ -93,7 +97,7 @@ class Console:
                     case _:
                         print("Invalid command")
                         self.help()
-        self.exit()
+        await self.exit()
 
     def help(self):
         print("General Commands:")
@@ -132,12 +136,13 @@ class Console:
         print("add <service>: Add a new service")
         print("edit <service>: Edit a service")
         print("delete <service>: Delete a service\n")
+        print("save: Save the current vault")
 
-    def exit(self):
+    async def exit(self):
         if self.vault is not None:
             print("Saving vault")
             self.vault.commit()
-            handlers.save_vault(self.ws, self.user, self.vault)
+            await handlers.save_vault(self.ws, self.user, self.vault)
             self.vault.rm()
         print("Goodbye")
 
@@ -277,46 +282,46 @@ class Console:
         print("Entry updated")
 
     # Vault commands
-    def vault_list(self):
-        vaults = handlers.get_vaults(self.ws, self.user)
+    async def vault_list(self):
+        vaults = await handlers.get_vaults(self.ws, self.user)
         print("Vaults:")
         for vault in vaults:
             print(vault["name"])
 
-    def vault_select(self, vault_name):
-        self.vault = handlers.get_vault(
+    async def vault_select(self, vault_name):
+        self.vault = await handlers.get_vault(
             self.ws, self.user, vault_name, self.mkey
         )
         if self.vault is None:
             print("Failed to select vault")
             return
 
-    def vault_create(self):
+    async def vault_create(self):
         vault_name = input("Enter the name of the new vault: ")
-        if not handlers.create_vault(
+        if not await handlers.create_vault(
             self.ws, self.user, vault_name, self.mkey
         ):
             print("Failed to create vault")
             return
         print("Vault created")
-        self.vault = handlers.get_vault(
+        self.vault = await handlers.get_vault(
             self.ws, self.user, vault_name, self.mkey
         )
         print(f"Vault changed to {vault_name}")
 
-    def vault_rename(self):
+    async def vault_rename(self):
         self.select_vault()
         new_name = input("Enter the new name for the vault: ")
         if new_name == "":
             print("No name entered")
             return
         self.vault.name = new_name
-        if not handlers.save_vault(self.ws, self.user, self.vault):
+        if not await handlers.save_vault(self.ws, self.user, self.vault):
             print("Failed to rename vault")
             return
         print("Vault renamed")
 
-    def vault_delete(self):
+    async def vault_delete(self):
         self.select_vault()
         confirmation = input(
             f"Are you sure you want to delete {self.vault.name}? (y/N): "
@@ -324,18 +329,27 @@ class Console:
         if confirmation != "y" or confirmation != "yes":
             print("Vault not deleted")
             return
-        if not handlers.delete_vault(self.ws, self.user, self.vault.name):
+        if not await handlers.delete_vault(self.ws, self.user, self.vault.name):
             print("Failed to delete vault")
             return
         self.vault.rm()
         self.vault = None
         print("Vault deleted")
 
+    async def vault_save(self):
+        if self.vault is None:
+            print("No vault selected")
+            return
+        if not await handlers.save_vault(self.ws, self.user, self.vault):
+            print("Failed to save vault")
+            return
+        print("Vault saved")
+
     def vault_info(self):
         print(f"Vault: {self.vault.name}")
 
     # Account commands
-    def account_register(self):
+    async def account_register(self):
         if self.user is not None:
             print("You are already logged in")
             return
@@ -344,11 +358,11 @@ class Console:
         confirm_pass = getpass.getpass("Confirm your master password: ")
         if self.mkey != confirm_pass:
             print("Passwords do not match - try again")
-            self.account_register()
+            await self.account_register()
             return
-        if handlers.register(self.ws, self.email, self.mkey):
+        if await handlers.register(self.ws, self.email, self.mkey):
             print("Registration complete")
-            self.user = handlers.auth(self.ws, self.email, self.mkey)
+            self.user = await handlers.auth(self.ws, self.email, self.mkey)
             if self.user is None:
                 print("Failed to log in")
                 return
@@ -356,52 +370,52 @@ class Console:
         else:
             print("Failed to register")
 
-    def account_auth(self):
+    async def account_auth(self):
         if self.user is not None:
             print("You are already logged in")
             return
         self.email = input("Enter your email: ")
         self.mkey = getpass.getpass("Enter your master password: ")
-        self.user = handlers.auth(self.ws, self.email, self.mkey)
+        self.user = await handlers.auth(self.ws, self.email, self.mkey)
         if self.user is None:
             print("Invalid email or master password")
-            self.account_auth()
+            await self.account_auth()
             return
         print("Logged in")
 
-    def account_change_mkey(self):
+    async def account_change_mkey(self):
         if self.user is None:
             print("You must be logged in to change your master password")
             return
         mkey = getpass.getpass("Enter your current master password: ")
         if mkey != self.mkey:
             print("Incorrect password - try again")
-            self.account_change_mkey()
+            await self.account_change_mkey()
             return
         new_mkey = getpass.getpass("Enter your new master password: ")
         confirm_mkey = getpass.getpass("Confirm your new master password: ")
         if new_mkey != confirm_mkey:
             print("Passwords do not match - try again")
-            self.account_change_mkey()
+            await self.account_change_mkey()
             return
-        if handlers.change_mkey(self.ws, self.user, mkey, new_mkey):
+        if await handlers.change_mkey(self.ws, self.user, mkey, new_mkey):
             self.mkey = new_mkey
             print("Master password changed")
         else:
             print("Failed to change master password")
 
-    def account_change_email(self):
+    async def account_change_email(self):
         if self.user is None:
             print("You must be logged in to change your email")
             return
         new_email = input("Enter your new email: ")
-        if handlers.change_email(self.ws, self.user, new_email):
+        if await handlers.change_email(self.ws, self.user, new_email):
             self.email = new_email
             print("Email changed")
         else:
             print("Failed to change email")
 
-    def account_delete(self):
+    async def account_delete(self):
         if self.user is None:
             print("You must be logged in to delete your account")
             return
@@ -411,7 +425,7 @@ class Console:
         if confirmation != "y" or confirmation != "yes":
             print("Account not deleted")
             return
-        if handlers.delete_account(self.ws, self.user):
+        if await handlers.delete_account(self.ws, self.user):
             print("Account deleted")
         else:
             print("Failed to delete account")
