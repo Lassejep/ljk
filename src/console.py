@@ -86,11 +86,11 @@ class Console:
                     case "get":
                         self.service_get(command[1])
                     case "add":
-                        self.service_add(command[1])
+                        await self.service_add(command[1])
                     case "edit":
-                        self.service_edit(command[1])
+                        await self.service_edit(command[1])
                     case "delete":
-                        self.service_delete(command[1])
+                        await self.service_delete(command[1])
                     case "save":
                         await self.vault_save()
                     case "exit":
@@ -151,7 +151,7 @@ class Console:
             self.vault.rm()
         print("Goodbye")
 
-    def service_add(self, service):
+    async def service_add(self, service):
         if self.user is None:
             print("You must be logged in to add a service")
             return
@@ -167,6 +167,7 @@ class Console:
         notes = input("Enter any notes: ")
         self.vault.add(service, username, password, notes)
         self.vault.commit()
+        await self.vault_save()
         print("Entry added to vault")
 
     def service_get(self, service_id):
@@ -192,7 +193,7 @@ class Console:
             pyperclip.copy(entry["password"])
             print("Password copied to clipboard")
 
-    def service_delete(self, service_id):
+    async def service_delete(self, service_id):
         if self.user is None:
             print("You must be logged in to delete a service")
             return
@@ -208,6 +209,7 @@ class Console:
             return
         self.vault.delete(service_id)
         self.vault.commit()
+        await self.vault_save()
         print("Entry deleted")
 
     def service_search(self, query):
@@ -248,7 +250,7 @@ class Console:
             print(f"Notes: {entry['notes']}")
         print("---------------------------")
 
-    def service_edit(self, service_id):
+    async def service_edit(self, service_id):
         if self.user is None:
             print("You must be logged in to edit a service")
             return
@@ -284,6 +286,7 @@ class Console:
             notes = entry["notes"]
         self.vault.update(service_id, service, username, password, notes)
         self.vault.commit()
+        await self.vault_save()
         print("Entry updated")
 
     # Vault commands
