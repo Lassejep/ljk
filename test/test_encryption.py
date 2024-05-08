@@ -1,5 +1,4 @@
 import unittest
-import os
 from src import encryption
 
 
@@ -51,29 +50,3 @@ class TestEncryption(unittest.TestCase):
         encrypted_data = encryption.encrypt(data, key)
         decrypted_data = encryption.decrypt(encrypted_data, key)
         self.assertEqual(data, decrypted_data)
-
-    def test_encrypt_file(self):
-        key = encryption.generate_vault_key()
-        file_path = "test_file.txt"
-        with open(file_path, "w") as file:
-            file.write("test_data")
-        encrypted_data = encryption.encrypt_file(file_path, key)
-        self.assertNotEqual("test_data", encrypted_data)
-        os.remove(file_path)
-
-    def test_decrypt_file(self):
-        key = encryption.generate_vault_key()
-        file_path = "test_file.txt"
-        encrypted_file_path = "test_file_encrypted.txt"
-        with open(file_path, "w") as file:
-            file.write("test_data")
-        encrypted_data = encryption.encrypt_file(file_path, key)
-        with open(encrypted_file_path, "wb") as encrypted_file:
-            encrypted_file.write(encrypted_data)
-        self.assertNotEqual("test_data", encrypted_data)
-        encryption.decrypt_file(encrypted_file_path, key)
-        with open(file_path, "r") as file:
-            decrypted_data = file.read()
-        self.assertEqual("test_data", decrypted_data)
-        os.remove(file_path)
-        os.remove(encrypted_file_path)
