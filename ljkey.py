@@ -17,7 +17,7 @@ async def main():
     ssl_context.load_verify_locations(localhost_pem)
 
     async with websockets.connect(
-        "wss://localhost:8765", ssl=ssl_context
+        "wss://localhost:8765", ssl=ssl_context, ping_interval=None
     ) as websocket:
         ui = console.Console(websocket)
         await ui.run()
