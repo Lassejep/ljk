@@ -16,7 +16,6 @@ def generate_password(password_length=16):
     return password
 
 
-# TODO: Check if argon2 is implemented correctly
 def hash_password(password):
     return PasswordHasher().hash(password)
 
@@ -62,19 +61,3 @@ def decrypt(ciphertext, key, associated_data=None):
     nonce = ciphertext[:12]
     ciphertext = ciphertext[12:]
     return aesgcm.decrypt(nonce, ciphertext, associated_data)
-
-
-# TODO: Implement a better way to handle file encryption
-def encrypt_file(filepath, key):
-    with open(filepath, "rb") as f:
-        plaintext = f.read()
-    ciphertext = encrypt(plaintext, key)
-    return ciphertext
-
-
-def decrypt_file(filepath, key):
-    with open(filepath, "rb") as f:
-        ciphertext = f.read()
-    plaintext = decrypt(ciphertext, key)
-    with open(filepath, "wb") as f:
-        f.write(plaintext)
