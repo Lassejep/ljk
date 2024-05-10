@@ -1,7 +1,6 @@
 import unittest
 import os
 import websockets
-import ssl
 from src import encryption, handlers
 
 
@@ -10,11 +9,8 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         self.db_path = "/tmp/test.db"
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        localhost_pem = "/home/tinspring/ws/ljk_server/localhost.pem"
-        ssl_context.load_verify_locations(localhost_pem)
         self.ws = await websockets.connect(
-            "wss://localhost:8765", ssl=ssl_context, ping_interval=None
+            "wss://localhost:8765", ssl=None, ping_interval=None
         )
         self.email = "email"
         self.mkey = "mkey"
@@ -126,6 +122,8 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(status)
 
     async def asyncTearDown(self):
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
         await self.ws.close()
         if self.vault is not None:
             self.vault.rm()
