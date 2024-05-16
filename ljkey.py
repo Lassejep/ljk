@@ -2,6 +2,7 @@
 import ssl
 import websockets
 import asyncio
+import curses
 from src import console
 
 
@@ -15,7 +16,8 @@ async def main():
         "wss://localhost:8765", ssl=ssl_context, ping_interval=None
     ) as websocket:
         ui = console.Console(websocket)
-        await ui.run()
+        while True:
+            await ui.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    curses.wrapper(asyncio.run(main()))
