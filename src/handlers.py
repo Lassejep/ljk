@@ -133,6 +133,21 @@ async def update_vault_key(websocket, user, vault_name, e_vkey):
         return False
 
 
+async def update_vault_name(websocket, user, vault_name, new_vault_name):
+    msg = pickle.dumps({
+        "command": "update_vault_name",
+        "uid": user["id"],
+        "vault_name": vault_name,
+        "new_vault_name": new_vault_name
+    })
+    await websocket.send(msg)
+    response = pickle.loads(await websocket.recv())
+    if response["status"] == "success":
+        return True
+    else:
+        return False
+
+
 async def delete_vault(websocket, user, vault_name):
     msg = pickle.dumps({
         "command": "delete_vault",

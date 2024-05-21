@@ -1,5 +1,4 @@
 import pyperclip
-import getpass
 import curses
 import sys
 from . import handlers
@@ -28,17 +27,19 @@ class Console:
         self.window_size = self.window.getmaxyx()
         self.window_loc = self.window.getbegyx()
         self.widget = self.screen.subpad(
-            int(self.window_size[0] * 0.8), int(self.window_size[1] * 0.6),
-            self.window_loc[0] + int(self.window_size[0] * 0.1),
+            int(self.window_size[0] * 0.6), int(self.window_size[1] * 0.6),
+            self.window_loc[0] + int(self.window_size[0] * 0.2),
             self.window_loc[1] + int(self.window_size[1] * 0.2)
         )
         self.widget_size = self.widget.getmaxyx()
         self.widget_loc = self.widget.getbegyx()
         self.msgbox = self.screen.subpad(
-            3, self.window_size[1],
-            self.window_size[0] - 1, self.window_loc[1]
+            3, self.window_size[1], self.window_size[0] - 1, self.window_loc[1]
         )
 
+        curses.noecho()
+        curses.curs_set(0)
+        curses.set_escdelay(10)
         curses.start_color()
         curses.use_default_colors()
         for i in range(0, curses.COLORS):
@@ -49,7 +50,10 @@ class Console:
 
     async def run(self):
         try:
-            await self.start_menu()
+            if self.user is not None:
+                await self.main_menu()
+            else:
+                await self.start_menu()
         except Exception as e:
             await self.exit(e)
         except KeyboardInterrupt:
@@ -70,6 +74,7 @@ class Console:
 
     async def message(self, message, color=None):
         self.msgbox.erase()
+        self.msgbox.refresh()
         self.msgbox.box()
         if color is not None:
             self.msgbox.addstr(1, 1, message, color)
@@ -78,10 +83,34 @@ class Console:
         self.msgbox.noutrefresh()
         curses.doupdate()
 
-    async def wait_for_key(self):
-        key = None
-        while key != ord("q"):
-            key = self.screen.getch()
+    async def get_input(
+            self, window, return_func, secret=False, initial_string=""
+    ):
+        curses.curs_set(1)
+        window.keypad(True)
+        key = window.getkey()
+        string = initial_string
+        while key != "\n":
+            if key == "KEY_BACKSPACE":
+                if len(string) > 0:
+                    string = string[:-1]
+                    window.delch(window.getyx()[0], window.getyx()[1] - 1)
+                    window.insch(" ")
+                key = window.getkey()
+                continue
+            if self.escape(key):
+                window.erase()
+                window.refresh()
+                curses.curs_set(0)
+                return await return_func()
+            string += key
+            if secret:
+                window.addch("*")
+            else:
+                window.addch(key)
+            key = window.getkey()
+        curses.curs_set(0)
+        return string
 
     async def navigate(self, key, window, y, length):
         position = window.getyx()
@@ -104,15 +133,22 @@ class Console:
         window.move(*position)
         return position
 
+    def escape(self, key):
+        try:
+            if ord(key) == 27:
+                return True
+        except TypeError:
+            pass
+        return False
+
     # Menus
     async def start_menu(self):
         self.menu.keypad(True)
-        curses.noecho()
-        curses.curs_set(0)
         key = "1"
         while key != "\n":
             pos = await self.navigate(key, self.menu, y=1, length=3)
             self.menu.erase()
+            self.menu.refresh()
             self.menu.box()
             self.menu.addstr(0, 1, "Menu")
             self.menu.addstr(1, 1, "1. Login")
@@ -133,12 +169,11 @@ class Console:
 
     async def main_menu(self):
         self.menu.keypad(True)
-        curses.noecho()
-        curses.curs_set(0)
         key = "1"
         while key != "\n":
             pos = await self.navigate(key, self.menu, y=1, length=5)
             self.menu.erase()
+            self.menu.refresh()
             self.menu.box()
             self.menu.addstr(0, 1, "Menu")
             self.menu.addstr(1, 1, "1. Services")
@@ -155,9 +190,9 @@ class Console:
             key = self.menu.getkey()
 
         if pos[0] == 1:
-            await self.services_menu()
+            await self.services_window()
         elif pos[0] == 2:
-            await self.vaults_menu()
+            await self.vault_window()
         elif pos[0] == 3:
             await self.settings_menu()
         elif pos[0] == 4:
@@ -168,35 +203,32 @@ class Console:
     # Start menu windows
     async def account_auth(self):
         self.window.erase()
+        self.window.refresh()
         self.window.box()
-        curses.echo()
-        curses.curs_set(1)
 
         self.window.addstr(0, 1, "Login")
         email_field = "Enter your email: "
         password_field = "Enter your master password: "
         self.window.addstr(2, 1, email_field)
         self.window.addstr(3, 1, password_field)
-        self.email = self.window.getstr(
-            2, len(email_field) + 1
-        ).decode("utf-8")
-        curses.noecho()
-        self.mkey = self.window.getstr(
-            3, len(password_field) + 1
-        ).decode("utf-8")
+        self.window.move(2, len(email_field) + 1)
+        self.email = await self.get_input(self.window, self.start_menu)
+        self.window.move(3, len(password_field) + 1)
+        self.mkey = await self.get_input(
+            self.window, self.start_menu, secret=True
+        )
         self.user = await handlers.auth(self.ws, self.email, self.mkey)
-        curses.echo()
         if self.user is None:
-            await self.message("Failed to log in", self.error_color)
-            return
+            return await self.message("Failed to log in", self.error_color)
+        self.window.erase()
+        self.window.refresh()
         await self.message("Logged in")
         await self.main_menu()
 
     async def account_register(self):
         self.window.erase()
+        self.window.refresh()
         self.window.box()
-        curses.echo()
-        curses.curs_set(1)
 
         email_field = "Enter your email: "
         password_field = "Enter your master password: "
@@ -205,60 +237,190 @@ class Console:
         self.window.addstr(1, 1, email_field)
         self.window.addstr(2, 1, password_field)
         self.window.addstr(3, 1, confirm_field)
-
-        self.email = self.window.getstr(
-            1, len(email_field) + 1
-        ).decode("utf-8")
-        curses.noecho()
-        self.mkey = self.window.getstr(
-            2, len(password_field) + 1
-        ).decode("utf-8")
-        confirm_pass = self.window.getstr(
-            3, len(confirm_field) + 1
-        ).decode("utf-8")
+        self.window.move(1, len(email_field) + 1)
+        self.email = await self.get_input(self.window, self.start_menu)
+        self.window.move(2, len(password_field) + 1)
+        self.mkey = await self.get_input(
+            self.window, self.start_menu, secret=True
+        )
+        self.window.move(3, len(confirm_field) + 1)
+        confirm_pass = await self.get_input(
+            self.window, self.start_menu, secret=True
+        )
         if self.mkey != confirm_pass:
             await self.message("Passwords do not match", self.error_color)
-            await self.account_register()
-            return
+            return await self.account_register()
         if not await handlers.register(self.ws, self.email, self.mkey):
             await self.message("Failed to register", self.error_color)
-            await self.account_register()
-            return
+            return await self.account_register()
         await self.message("Registered")
         self.user = await handlers.auth(self.ws, self.email, self.mkey)
         if self.user is None:
             await self.message("Failed to log in", self.error_color)
-            await self.account_auth()
-            return
+            return await self.account_auth()
         await self.message("Logged in")
+        self.window.erase()
+        self.window.refresh()
         await self.main_menu()
 
     # Main menu windows
-    async def vaults_menu(self):
+    # TODO: Add service search
+    async def services_window(self):
+        if self.vault is None:
+            await self.message("No vault selected", self.error_color)
+            return await self.main_menu()
         self.window.keypad(True)
-        curses.set_escdelay(25)
-        curses.noecho()
-        curses.curs_set(0)
+        key = "4"
+        services = self.vault.services()
+        if services is None:
+            services = []
+        while key != "\n":
+            pos = await self.navigate(
+                key, self.window, y=4,
+                length=len(services)
+            )
+            self.window.erase()
+            self.window.refresh()
+            self.window.box()
+            self.window.addstr(0, 1, "Services")
+            self.window.hline(3, 1, curses.ACS_HLINE, self.window_size[1] - 2)
+            self.window.vline(1, self.window_size[1] // 3, curses.ACS_VLINE, 2)
+            self.window.vline(
+                1, self.window_size[1] // 3 * 2, curses.ACS_VLINE, 2
+            )
+            self.window.addstr(1, 1, "<Y> Copy password")
+            self.window.addstr(
+                1, self.window_size[1] // 3 + 1, "<Enter> Show service"
+            )
+            self.window.addstr(
+                1, self.window_size[1] // 3 * 2 + 1, "<A> Add service"
+            )
+            self.window.addstr(2, 1, "<D> Delete service")
+            self.window.addstr(
+                2, self.window_size[1] // 3 + 1, "<E> Edit service"
+            )
+            self.window.addstr(
+                2, self.window_size[1] // 3 * 2 + 1, "<ESC> Main menu"
+            )
+            for i, service in enumerate(services):
+                self.window.addstr(i + 4, 1, service["service"])
 
-        key = "6"
+            selected_string = self.window.instr(
+                pos[0], 1, self.window.getmaxyx()[1] - 4
+            ).decode("utf-8")
+            self.window.addstr(pos[0], 1, " " + selected_string, self.hl_color)
+
+            service = services[pos[0] - 4] if len(services) > 0 else None
+            key = self.window.getkey()
+            if key == "Y":
+                await self.copy_password(service["id"])
+            if key == "A":
+                await self.service_add()
+                services = self.vault.services()
+            if key == "D":
+                await self.service_delete(service["id"])
+                services = self.vault.services()
+            if key == "E":
+                await self.service_edit(service["id"])
+                services = self.vault.services()
+            if self.escape(key):
+                self.window.erase()
+                self.window.refresh()
+                return await self.main_menu()
+        return await self.services_window()
+
+    async def vault_window(self):
+        self.window.erase()
+        self.window.refresh()
+        self.window.keypad(True)
+
+        key = "4"
         vaults = await handlers.get_vaults(self.ws, self.user)
         if vaults is None:
             vaults = []
         while key != "\n":
             pos = await self.navigate(
-                key, self.window, y=6,
+                key, self.window, y=4,
                 length=len(vaults)
             )
             self.window.erase()
+            self.window.refresh()
             self.window.box()
             self.window.addstr(0, 1, "Vaults")
+            self.window.hline(3, 1, curses.ACS_HLINE, self.window_size[1] - 2)
+            self.window.vline(1, self.window_size[1] // 3, curses.ACS_VLINE, 2)
+            self.window.vline(
+                1, self.window_size[1] // 3 * 2, curses.ACS_VLINE, 2
+            )
             self.window.addstr(1, 1, "<Enter> select vault")
-            self.window.addstr(2, 1, "<A> Add vault")
-            self.window.addstr(3, 1, "<D> Delete vault")
-            self.window.addstr(4, 1, "<R> Rename vault")
-            self.window.addstr(5, 1, "<Esc> Main menu")
+            self.window.addstr(
+                1, self.window_size[1] // 3 + 1, "<A> Add vault")
+            self.window.addstr(
+                1, self.window_size[1] // 3 * 2 + 1, "<D> Delete vault"
+            )
+            self.window.addstr(2, 1, "<R> Rename vault")
+            self.window.addstr(
+                2, self.window_size[1] // 3 + 1, "<ESC> Main menu"
+            )
             for i, vault in enumerate(vaults):
-                self.window.addstr(i + 6, 1, vault["name"])
+                self.window.addstr(i + 4, 1, vault["name"])
+
+            selected_string = self.window.instr(
+                pos[0], 1, self.window.getmaxyx()[1] - 4
+            ).decode("utf-8")
+            self.window.addstr(pos[0], 1, " " + selected_string, self.hl_color)
+
+            vault = vaults[pos[0] - 4] if len(vaults) > 0 else None
+            key = self.window.getkey()
+            if key == "A":
+                await self.vault_create()
+                vaults = await handlers.get_vaults(self.ws, self.user)
+            if key == "D":
+                await self.vault_delete(vault["name"])
+                vaults = await handlers.get_vaults(self.ws, self.user)
+            if key == "R":
+                await self.vault_rename(vault)
+                vaults = await handlers.get_vaults(self.ws, self.user)
+            if self.escape(key):
+                self.window.erase()
+                self.window.refresh()
+                return await self.main_menu()
+
+        self.vault = await handlers.get_vault(
+            self.ws, self.user, vault["name"], self.mkey
+        )
+        if self.vault is None:
+            await self.message("Failed to select vault", self.error_color)
+            return await self.vault_window()
+        await self.message(f"Vault selected: {self.vault.name}")
+        self.window.erase()
+        self.window.refresh()
+        return await self.vault_window()
+
+    # TODO: Change the settings menu
+    async def settings_menu(self):
+        self.window.erase()
+        self.window.refresh()
+        self.window.box()
+        self.window.addstr(0, 1, "Settings")
+        key = "4"
+        while key != "\n":
+            pos = await self.navigate(key, self.window, y=4, length=4)
+            self.window.erase()
+            self.window.refresh()
+            self.window.box()
+            self.window.addstr(0, 1, "Settings")
+            self.window.hline(3, 1, curses.ACS_HLINE, self.window_size[1] - 2)
+            self.window.vline(1, self.window_size[1] // 3, curses.ACS_VLINE, 2)
+            self.window.vline(
+                1, self.window_size[1] // 3 * 2, curses.ACS_VLINE, 2
+            )
+            self.window.addstr(1, 1, "<C> Change master password")
+            self.window.addstr(
+                1, self.window_size[1] // 3 + 1, "<E> Change email")
+            self.window.addstr(
+                1, self.window_size[1] // 3 * 2 + 1, "<D> Delete account")
+            self.window.addstr(2, 1, "<ESC> Main menu")
 
             selected_string = self.window.instr(
                 pos[0], 1, self.window.getmaxyx()[1] - 4
@@ -266,290 +428,236 @@ class Console:
             self.window.addstr(pos[0], 1, " " + selected_string, self.hl_color)
 
             key = self.window.getkey()
-            if key == "A":
-                await self.vault_create()
+            if key == "C":
+                await self.account_change_mkey()
+            if key == "E":
+                await self.account_change_email()
             if key == "D":
-                await self.vault_delete()
-            if key == "R":
-                await self.vault_rename()
-            if ord(key) == 27:
-                await self.main_menu()
-                return
-
-        self.vault = await handlers.get_vault(
-            self.ws, self.user, vaults[pos[0] - 6]["name"], self.mkey
-        )
-        if self.vault is None:
-            await self.message("Failed to select vault", self.error_color)
-            await self.vaults_menu()
-            return
-        await self.message("Vault selected")
-        await self.vaults_menu()
+                await self.account_delete()
+            if self.escape(key):
+                self.window.erase()
+                self.window.refresh()
+                return await self.main_menu()
+        return await self.settings_menu()
 
     async def account_logout(self):
         self.email = None
         self.mkey = None
         self.user = None
         self.vault = None
+        self.screen.clear()
+        await self.message("Logged out")
         await self.start_menu()
 
+    # Vault menu functions
     async def vault_create(self):
-        curses.echo()
-        curses.curs_set(1)
         self.widget.erase()
+        self.widget.refresh()
         self.widget.box()
         self.widget.addstr(0, 1, "Create vault")
         name_field = "Vault name: "
         self.widget.addstr(1, 1, name_field)
-        vault_name = self.widget.getstr(1, len(name_field) + 1).decode("utf-8")
+        self.widget.move(1, len(name_field) + 1)
+        vault_name = await self.get_input(self.widget, self.vault_window)
         if not await handlers.create_vault(
             self.ws, self.user, vault_name, self.mkey
         ):
             await self.message("Failed to create vault", self.error_color)
-            await self.vaults_menu()
-            return
+            return await self.vault_window()
         await self.message("Vault created")
-        await self.vaults_menu()
+        self.widget.erase()
+        self.widget.refresh()
 
-    # TODO: Convert these to use curses
-    async def service_add(self, service):
-        if self.user is None:
-            print("You must be logged in to add a service")
+    async def vault_delete(self, vault_name):
+        await self.message("Are you sure you want to delete this vault? (y/N)")
+        confirmation = self.msgbox.getkey().lower()
+        await self.message(f"Confirmation: {confirmation}")
+        if confirmation != "y":
+            return await self.message("Vault not deleted", self.error_color)
+        if not await handlers.delete_vault(self.ws, self.user, vault_name):
+            return await self.message(
+                "Failed to delete vault", self.error_color
+            )
+        if self.vault is not None and self.vault.name == vault_name:
+            self.vault.rm()
+            self.vault = None
+        await self.message(f"Delted vault: {vault_name}")
+
+    async def vault_rename(self, vault):
+        self.widget.erase()
+        self.widget.refresh()
+        self.widget.box()
+        self.widget.addstr(0, 1, "Rename vault")
+        name_field = "New vault name: " + vault["name"]
+        self.widget.addstr(1, 1, name_field)
+        self.widget.move(1, len(name_field) + 1)
+        new_name = await self.get_input(
+            self.widget, self.vault_window, initial_string=vault["name"]
+        )
+        if new_name == "":
+            await self.message("Invalid name", self.error_color)
+            self.widget.erase()
+            return self.widget.refresh()
+        if not await handlers.update_vault_name(
+            self.ws, self.user, vault["name"], new_name
+        ):
+            await self.message("Failed to rename vault", self.error_color)
+            self.widget.erase()
+            return self.widget.refresh()
+        await self.message("Vault renamed")
+        self.widget.erase()
+        self.widget.refresh()
+
+    # Service menu functions
+    async def copy_password(self, service_id):
+        entry = self.vault.service(service_id)
+        if entry is None:
+            await self.message("Entry not found", self.error_color)
             return
-        if self.vault is None:
-            print("No vault selected")
-            return
-        username = input("Enter the username: ")
-        confirm_generate = input("Generate a password? (Y/n): ").lower()
-        if confirm_generate == "n" or confirm_generate == "no":
-            password = input("Enter the password: ")
-        else:
-            password = generate_password()
-        notes = input("Enter any notes: ")
+        pyperclip.copy(entry["password"])
+        await self.message("Password copied to clipboard")
+
+    # TODO: Add a password generator
+    async def service_add(self):
+        self.widget.erase()
+        self.widget.refresh()
+        self.widget.box()
+        self.widget.addstr(0, 1, "Add service")
+        service_field = "Service name: "
+        username_field = "Username: "
+        password_field = "Password: "
+        notes_field = "Notes: "
+        self.widget.addstr(1, 1, service_field)
+        self.widget.addstr(2, 1, username_field)
+        self.widget.addstr(3, 1, password_field)
+        self.widget.addstr(4, 1, notes_field)
+        self.widget.move(1, len(service_field) + 1)
+        service = await self.get_input(self.widget, self.services_window)
+        self.widget.move(2, len(username_field) + 1)
+        username = await self.get_input(self.widget, self.services_window)
+        self.widget.move(3, len(password_field) + 1)
+        password = await self.get_input(
+            self.widget, self.services_window, secret=True
+        )
+        self.widget.move(4, len(notes_field) + 1)
+        notes = await self.get_input(self.widget, self.services_window)
         self.vault.add(service, username, password, notes)
         self.vault.commit()
-        await self.vault_save()
-        print("Entry added to vault")
-
-    def service_get(self, service_id):
-        if self.user is None:
-            print("You must be logged in to get a service")
-            return
-        if self.vault is None:
-            print("No vault selected")
-            return
-        entry = self.vault.service(service_id)
-        if entry is None:
-            print("Entry not found")
-            return
-        print("---------------------------")
-        print(f"Service ID: {entry['id']}")
-        print(f"Service: {entry['service']}")
-        print(f"User: {entry['user']}")
-        print(f"Password: {entry['password']}")
-        print(f"Notes: {entry['notes']}")
-        print("---------------------------")
-        copy = input("Copy password to clipboard? (y/N): ").lower()
-        if copy == "y" or copy == "yes":
-            pyperclip.copy(entry["password"])
-            print("Password copied to clipboard")
+        await handlers.save_vault(self.ws, self.user, self.vault)
+        await self.message("Service added")
 
     async def service_delete(self, service_id):
-        if self.user is None:
-            print("You must be logged in to delete a service")
-            return
-        if self.vault is None:
-            print("No vault selected")
-            return
-        service = self.vault.service(service_id)
-        confirmation = input(
-            f"Are you sure you want to delete {service['service']}? (y/N): "
-        ).lower()
-        if confirmation != "y" or confirmation != "yes":
-            print("Entry not deleted")
-            return
+        confirmation = await self.get_input(
+            self.widget, self.services_window, secret=True
+        )
+        if confirmation != "y":
+            return await self.message("Entry not deleted", self.error_color)
         self.vault.delete(service_id)
         self.vault.commit()
-        await self.vault_save()
-        print("Entry deleted")
+        await handlers.save_vault(self.ws, self.user, self.vault)
+        await self.message("Entry deleted")
 
-    def service_search(self, query):
-        if self.user is None:
-            print("You must be logged in to search for a service")
-            return
-        if self.vault is None:
-            print("No vault selected")
-            return
-        entries = self.vault.search(query)
-        if entries is None:
-            print("No services match your search")
-            return
-        for entry in entries:
-            print("---------------------------")
-            print(f"Service ID: {entry['id']}")
-            print(f"Service: {entry['service']}")
-            print(f"User: {entry['user']}")
-            print(f"Notes: {entry['notes']}")
-        print("---------------------------")
-
-    def service_list(self):
-        if self.user is None:
-            print("You must be logged in to list services")
-            return
-        if self.vault is None:
-            print("No vault selected")
-            return
-        entries = self.vault.services()
-        if entries is None:
-            print("No entries in vault")
-            return
-        for entry in entries:
-            print("---------------------------")
-            print(f"Service ID: {entry['id']}")
-            print(f"Service: {entry['service']}")
-            print(f"User: {entry['user']}")
-            print(f"Notes: {entry['notes']}")
-        print("---------------------------")
-
+    # TODO: Add a password generator
     async def service_edit(self, service_id):
-        if self.user is None:
-            print("You must be logged in to edit a service")
-            return
-        if self.vault is None:
-            print("No vault selected")
-            return
         entry = self.vault.service(service_id)
         if entry is None:
-            print("Entry not found")
-            return
-        print("---------------------------")
-        print(f"Service ID: {entry['id']}")
-        print(f"Service: {entry['service']}")
-        print(f"User: {entry['user']}")
-        print(f"Password: {entry['password']}")
-        print(f"Notes: {entry['notes']}")
-        print("---------------------------")
-        service = input(f"Enter the new service name ({entry['service']}): ")
-        if service == "":
-            service = entry["service"]
-        username = input(f"Enter the new username ({entry['user']}): ")
-        if username == "":
-            username = entry["user"]
-        confirm_generate = input("Generate a new password? (y/N): ").lower()
-        if confirm_generate == "y" or confirm_generate == "yes":
-            password = generate_password()
-        else:
-            password = input(f"Enter the new password ({entry['password']}): ")
-            if password == "":
-                password = entry["password"]
-        notes = input(f"Enter the new notes ({entry['notes']}): ")
-        if notes == "":
-            notes = entry["notes"]
+            return await self.message("Entry not found", self.error_color)
+        self.widget.erase()
+        self.widget.refresh()
+        self.widget.box()
+        self.widget.addstr(0, 1, "Edit service")
+        service_field = "Service name: " + entry["service"]
+        username_field = "Username: " + entry["user"]
+        password_field = "Password: " + "*" * len(entry["password"])
+        notes_field = "Notes: " + entry["notes"]
+        self.widget.addstr(1, 1, service_field)
+        self.widget.addstr(2, 1, username_field)
+        self.widget.addstr(3, 1, password_field)
+        self.widget.addstr(4, 1, notes_field)
+        self.widget.move(1, len(service_field) + 1)
+        service = await self.get_input(
+            self.widget, self.services_window, initial_string=entry["service"]
+        )
+        self.widget.move(2, len(username_field) + 1)
+        username = await self.get_input(
+            self.widget, self.services_window, initial_string=entry["user"]
+        )
+        self.widget.move(3, len(password_field) + 1)
+        password = await self.get_input(
+            self.widget, self.services_window,
+            secret=True, initial_string=entry["password"]
+        )
+        self.widget.move(4, len(notes_field) + 1)
+        notes = await self.get_input(self.widget, self.services_window)
         self.vault.update(service_id, service, username, password, notes)
         self.vault.commit()
-        await self.vault_save()
-        print("Entry updated")
+        await handlers.save_vault(self.ws, self.user, self.vault)
+        await self.message("Service updated")
 
-    # Vault commands
-    async def vault_list(self):
-        vaults = await handlers.get_vaults(self.ws, self.user)
-        print("Vaults:")
-        for vault in vaults:
-            print(vault["name"])
-
-    async def vault_select(self, vault_name):
-        self.vault = await handlers.get_vault(
-            self.ws, self.user, vault_name, self.mkey
-        )
-        if self.vault is None:
-            print("Failed to select vault")
-            return
-
-    async def vault_rename(self):
-        self.select_vault()
-        new_name = input("Enter the new name for the vault: ")
-        if new_name == "":
-            print("No name entered")
-            return
-        self.vault.name = new_name
-        if not await handlers.save_vault(self.ws, self.user, self.vault):
-            print("Failed to rename vault")
-            return
-        print("Vault renamed")
-
-    async def vault_delete(self):
-        self.select_vault()
-        confirmation = input(
-            f"Are you sure you want to delete {self.vault.name}? (y/N): "
-        ).lower()
-        if confirmation != "y" or confirmation != "yes":
-            print("Vault not deleted")
-            return
-        if not await handlers.delete_vault(
-            self.ws, self.user, self.vault.name
-        ):
-            print("Failed to delete vault")
-            return
-        self.vault.rm()
-        self.vault = None
-        print("Vault deleted")
-
-    async def vault_save(self):
-        if self.vault is None:
-            print("No vault selected")
-            return
-        if not await handlers.save_vault(self.ws, self.user, self.vault):
-            print("Failed to save vault")
-            return
-        print("Vault saved")
-
-    def vault_info(self):
-        print(f"Vault: {self.vault.name}")
-
-    # Account commands
+    # Settings menu functions
+    # TODO: Check the all the settings functions
     async def account_change_mkey(self):
-        if self.user is None:
-            print("You must be logged in to change your master password")
-            return
-        mkey = getpass.getpass("Enter your current master password: ")
-        if mkey != self.mkey:
-            print("Incorrect password - try again")
-            await self.account_change_mkey()
-            return
-        new_mkey = getpass.getpass("Enter your new master password: ")
-        confirm_mkey = getpass.getpass("Confirm your new master password: ")
-        if new_mkey != confirm_mkey:
-            print("Passwords do not match - try again")
-            await self.account_change_mkey()
-            return
-        if await handlers.change_mkey(self.ws, self.user, mkey, new_mkey):
-            self.mkey = new_mkey
-            print("Master password changed")
-        else:
-            print("Failed to change master password")
+        self.widget.erase()
+        self.widget.refresh()
+        self.widget.box()
+        self.widget.addstr(0, 1, "Change master password")
+        current_field = "Current password: "
+        new_field = "New password: "
+        confirm_field = "Confirm new password: "
+        self.widget.addstr(1, 1, current_field)
+        self.widget.addstr(2, 1, new_field)
+        self.widget.addstr(3, 1, confirm_field)
+        self.widget.move(1, len(current_field) + 1)
+        current = await self.get_input(
+            self.widget, self.settings_menu, secret=True
+        )
+        self.widget.move(2, len(new_field) + 1)
+        new = await self.get_input(
+            self.widget, self.settings_menu, secret=True
+        )
+        self.widget.move(3, len(confirm_field) + 1)
+        confirm = await self.get_input(
+            self.widget, self.settings_menu, secret=True
+        )
+        if new != confirm:
+            await self.message("Passwords do not match", self.error_color)
+            return await self.account_change_mkey()
+        if not await handlers.change_mkey(
+            self.ws, self.user, current, new
+        ):
+            await self.message("Failed to change password", self.error_color)
+            return await self.account_change_mkey()
+        self.mkey = new
+        await self.message("Password changed")
 
     async def account_change_email(self):
-        if self.user is None:
-            print("You must be logged in to change your email")
-            return
-        new_email = input("Enter your new email: ")
-        if await handlers.change_email(self.ws, self.user, new_email):
-            self.email = new_email
-            print("Email changed")
-        else:
-            print("Failed to change email")
+        self.widget.erase()
+        self.widget.refresh()
+        self.widget.box()
+        self.widget.addstr(0, 1, "Change email")
+        email_field = "New email: "
+        self.widget.addstr(1, 1, email_field)
+        self.widget.move(1, len(email_field) + 1)
+        new_email = await self.get_input(self.widget, self.settings_menu)
+        if not await handlers.change_email(self.ws, self.user, new_email):
+            await self.message("Failed to change email", self.error_color)
+            return await self.account_change_email()
+        self.email = new_email
+        await self.message("Email changed")
 
     async def account_delete(self):
-        if self.user is None:
-            print("You must be logged in to delete your account")
-            return
-        confirmation = input(
-            "Are you sure you want to delete your account? (y/N): "
-        ).lower()
-        if confirmation != "y" or confirmation != "yes":
-            print("Account not deleted")
-            return
-        if await handlers.delete_account(self.ws, self.user):
-            print("Account deleted")
-        else:
-            print("Failed to delete account")
+        confirmation = await self.get_input(
+            self.widget, self.settings_menu, secret=True
+        )
+        if confirmation != "y":
+            return await self.message("Account not deleted", self.error_color)
+        if not await handlers.delete_account(self.ws, self.user):
+            return await self.message(
+                "Failed to delete account", self.error_color
+            )
+        await self.message("Account deleted")
+        self.email = None
+        self.mkey = None
+        self.user = None
+        self.vault = None
+        await self.start_menu()
