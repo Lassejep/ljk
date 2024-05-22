@@ -52,6 +52,7 @@ class Console:
         self.text_color = curses.color_pair(0)
         self.hl_color = curses.color_pair(2)
         self.error_color = curses.color_pair(4)
+        self.searching = False
 
     async def run(self):
         try:
@@ -265,7 +266,7 @@ class Console:
         await self.main_menu()
 
     # Main menu windows
-    async def services_window(self):
+    async def services_window(self, search=None):
         y_offset = 7
         y_third = self.window_size[1] // 3
         hline = curses.ACS_HLINE
@@ -275,6 +276,12 @@ class Console:
             return await self.vault_window()
         key = f"{y_offset}"
         services = self.vault.services()
+        if search is not None:
+            query = re.compile(search, re.IGNORECASE)
+            services = [
+                service for service in services
+                if query.search(service["service"])
+            ]
 
         while self.escape(key) is False:
             if services is None:
@@ -327,6 +334,10 @@ class Console:
                 self.window, pos[0], y_third * 2 + 1, y_third - 2
             )
 
+            if self.searching:
+                self.window.refresh()
+                await self.search_services(search)
+                return
             key = self.window.getkey()
             if services == []:
                 service = None
@@ -335,7 +346,7 @@ class Console:
             match key:
                 case "/":
                     if services != []:
-                        services = await self.search_services()
+                        await self.search_services()
                 case "Y":
                     if service is not None:
                         await self.copy_password(service["id"])
@@ -353,6 +364,8 @@ class Console:
                 case "\n":
                     if service is not None:
                         await self.view_service(service)
+        if search is not None:
+            return await self.services_window()
         self.redraw(self.window)
         return await self.main_menu()
 
@@ -626,19 +639,23 @@ class Console:
         self.message("INFO: Service updated")
 
     # TODO: Make the search function in real time
-    async def search_services(self):
+    async def search_services(self, search=""):
+        self.searching = True
         self.redraw(self.msgbox)
-        services = self.vault.services()
-        search_prompt = "QUERY: "
+        search_prompt = "QUERY: " + search
         self.msgbox.addstr(1, 1, search_prompt)
         self.msgbox.move(1, len(search_prompt) + 1)
-        search = await self.get_input(self.msgbox, self.services_window)
-        if search == "":
-            return services
-        query = re.compile(search, re.IGNORECASE)
-        return [
-            service for service in services if query.search(service["service"])
-        ]
+        key = self.msgbox.getkey()
+        if self.escape(key):
+            search = None
+            self.searching = False
+        elif key == "\n":
+            self.searching = False
+        elif key == "KEY_BACKSPACE":
+            search = search[:-1]
+        else:
+            search += key
+        return await self.services_window(search)
 
     # Settings menu functions
     # TODO: Check the all the settings functions
