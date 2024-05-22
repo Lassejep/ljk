@@ -710,9 +710,13 @@ class Console:
         self.message("INFO: Email changed")
 
     async def account_delete(self):
-        confirmation = await self.get_input(
-            self.widget, self.settings_window, secret=True
+        message = (
+            "CONFIRMATION: Are you sure you want to delete your account? (y/N)"
         )
+        self.msgbox.addstr(1, 1, message, self.hl_color)
+        self.msgbox.move(1, len(message) + 1)
+        self.msgbox.refresh()
+        confirmation = self.msgbox.getkey().lower()
         if confirmation != "y":
             return self.message(
                 "ERROR: Account not deleted", self.error_color
@@ -726,4 +730,5 @@ class Console:
         self.mkey = None
         self.user = None
         self.vault = None
+        self.redraw(self.window)
         await self.start_menu()
