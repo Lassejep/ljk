@@ -657,7 +657,6 @@ class Console:
         return await self.services_window(search)
 
     # Settings menu functions
-    # TODO: Check the all the settings functions
     async def account_change_mkey(self):
         self.redraw(self.widget)
         self.widget.addstr(0, 1, "Change master password")
