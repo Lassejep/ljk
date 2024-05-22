@@ -638,7 +638,6 @@ class Console:
         await handlers.save_vault(self.ws, self.user, self.vault)
         self.message("INFO: Service updated")
 
-    # TODO: Make the search function in real time
     async def search_services(self, search=""):
         self.searching = True
         self.redraw(self.msgbox)
