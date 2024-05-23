@@ -1,19 +1,28 @@
 import sqlite3
 
 
-class Vault:
-    def __init__(self, name, key):
-        self.name = name
-        self.key = key
-        self.connection = sqlite3.connect(":memory:")
+class Database:
+    def __init__(self, database_name):
+        self.database_name = database_name
+        self.connection = sqlite3.connect(self.database_name)
         self.cursor = self.connection.cursor()
         self.cursor.execute(
-            """CREATE TABLE IF NOT EXISTS vault(
+            """CREATE TABLE IF NOT EXISTS users(
                 id INTEGER PRIMARY KEY,
-                service TEXT,
-                user TEXT,
-                password TEXT,
-                notes TEXT
+                email TEXT NOT NULL UNIQUE,
+                salt BYTES NOT NULL,
+                auth_key BYTES NOT NULL
+            )"""
+        )
+
+        self.cursor.execute(
+            """CREATE TABLE IF NOT EXISTS vaults(
+                id INTEGER PRIMARY KEY,
+                uid INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                key BYTES NOT NULL,
+                data BLOB,
+                FOREIGN KEY(uid) REFERENCES users(id)
             )"""
         )
 
@@ -23,94 +32,174 @@ class Vault:
     def rollback(self):
         self.connection.rollback()
 
-    def rm(self):
-        self.cursor.close()
-        self.connection.close()
+    def add_user(self, email, salt, auth_key):
+        try:
+            self.cursor.execute(
+                """INSERT INTO users(
+                    email, salt, auth_key
+                ) VALUES (?, ?, ?)""",
+                (email, salt, auth_key)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"User with email: {email} already exists")
 
-    def dump(self):
-        self.connection.commit()
-        return self.connection.serialize()
+    def delete_user(self, uid):
+        try:
+            self.cursor.execute(
+                """DELETE FROM users WHERE id = ?""", (uid,)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"User with id: {uid} does not exist")
 
-    def load(self, data):
-        self.connection.deserialize(data)
-
-    def add(
-        self, service="", user="", password="", notes=""
-    ):
+    def get_user(self, uid):
         self.cursor.execute(
-            """INSERT INTO vault(
-                service, user, password, notes
-            ) VALUES(?, ?, ?, ?)""",
-            (service, user, password, notes)
+            """SELECT * FROM users WHERE id = ?""", (uid,)
         )
+        user = self.cursor.fetchone()
+        if user is not None:
+            return {
+                "id": user[0],
+                "email": user[1],
+                "salt": user[2],
+                "auth_key": user[3],
+            }
+        else:
+            raise Exception(f"User with id: {uid} not found")
 
-    def service(self, id):
-        self.cursor.execute(
-            """SELECT * FROM vault WHERE id = ?""", (id,)
-        )
-        service = self.cursor.fetchone()
-        if not service:
-            return None
-        return {
-            "id": service[0],
-            "service": service[1],
-            "user": service[2],
-            "password": service[3],
-            "notes": service[4]
-        }
+    def update_email(self, uid, new_email):
+        try:
+            self.cursor.execute(
+                """UPDATE users SET email = ? WHERE id = ?""",
+                (new_email, uid)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"User with email: {new_email} already exists")
 
-    def delete(self, id):
-        self.cursor.execute(
-            """DELETE FROM vault WHERE id = ?""", (id,)
-        )
+    def update_auth_key(self, uid, auth_key):
+        try:
+            self.cursor.execute(
+                """UPDATE users SET auth_key = ? WHERE id = ?""",
+                (auth_key, uid)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"User with id: {uid} does not exist")
 
-    def update(
-        self, id, service, user, password, notes=""
-    ):
+    def get_id(self, email):
         self.cursor.execute(
-            """UPDATE vault SET
-                service = ?,
-                user = ?,
-                password = ?,
-                notes = ?
-            WHERE id = ?""",
-            (service, user, password, notes, id)
+            """SELECT id FROM users WHERE email = ?""", (email,)
         )
+        id = self.cursor.fetchone()
+        if id is not None:
+            return id[0]
+        else:
+            raise Exception(f"User with email: {email} not found")
 
-    def services(self):
-        self.cursor.execute(
-            """SELECT * FROM vault"""
-        )
-        services = self.cursor.fetchall()
-        services_list = []
-        if not services:
-            return None
-        for service in services:
-            services_list.append({
-                "id": service[0],
-                "service": service[1],
-                "user": service[2],
-                "password": service[3],
-                "notes": service[4]
-            })
-        return services_list
+    def get_salt(self, uid):
+        user = self.get_user(uid)
+        return user["salt"]
 
-    def search(self, service):
-        service = f"%{service}%"
+    def get_auth_key(self, uid):
         self.cursor.execute(
-            """SELECT * FROM vault WHERE service LIKE ? OR notes LIKE ?""",
-            (service, service)
+            """SELECT auth_key FROM users WHERE id = ?""", (uid,)
         )
-        services = self.cursor.fetchall()
-        if not services:
-            return None
-        services_list = []
-        for service in services:
-            services_list.append({
-                "id": service[0],
-                "service": service[1],
-                "user": service[2],
-                "password": service[3],
-                "notes": service[4]
-            })
-        return services_list
+        auth_key = self.cursor.fetchone()
+        if auth_key is not None:
+            return auth_key[0]
+        else:
+            raise Exception(f"User with id: {uid} not found")
+
+    def add_vault(self, uid, name, key, data):
+        if name.strip() == "":
+            raise Exception("Vault name cannot be empty")
+        try:
+            self.cursor.execute(
+                """INSERT INTO vaults(
+                    uid, name, key, data
+                ) VALUES (?, ?, ?, ?)""",
+                (uid, name, key, data)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"Vault with name: {name} already exists")
+
+    def delete_vault(self, uid, name):
+        try:
+            self.cursor.execute(
+                """DELETE FROM vaults WHERE uid = ? AND name = ?""",
+                (uid, name)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"Vault with name: {name} does not exist")
+
+    def get_vaults(self, uid):
+        self.cursor.execute(
+            """SELECT * FROM vaults WHERE uid = ?""", (uid,)
+        )
+        vaults = self.cursor.fetchall()
+        if len(vaults) > 0:
+            return [
+                {
+                    "id": vault[0],
+                    "uid": vault[1],
+                    "name": vault[2],
+                    "key": vault[3],
+                    "data": vault[4],
+                } for vault in vaults
+            ]
+        else:
+            raise Exception(f"User with id: {uid} has no vaults")
+
+    def get_vault(self, uid, name):
+        self.cursor.execute(
+            """SELECT * FROM vaults WHERE uid = ? AND name = ?""",
+            (uid, name)
+        )
+        vault = self.cursor.fetchone()
+        if vault is not None:
+            return {
+                "id": vault[0],
+                "uid": vault[1],
+                "name": vault[2],
+                "key": vault[3],
+                "data": vault[4],
+            }
+        else:
+            raise Exception(f"Vault with name: {name} not found")
+
+    def get_vault_key(self, uid, name):
+        vault = self.get_vault(uid, name)
+        return vault["key"]
+
+    def get_vault_data(self, uid, name):
+        vault = self.get_vault(uid, name)
+        return vault["data"]
+
+    def get_vault_id(self, uid, name):
+        vault = self.get_vault(uid, name)
+        return vault["id"]
+
+    def update_vault_name(self, uid, name, new_name):
+        try:
+            self.cursor.execute(
+                """UPDATE vaults SET name = ? WHERE uid = ? AND name = ?""",
+                (new_name, uid, name)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"Vault with name: {new_name} already exists")
+
+    def update_vault_key(self, uid, name, key):
+        try:
+            self.cursor.execute(
+                """UPDATE vaults SET key = ? WHERE uid = ? AND name = ?""",
+                (key, uid, name)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"Vault with name: {name} does not exist")
+
+    def update_vault(self, uid, name, data):
+        try:
+            self.cursor.execute(
+                """UPDATE vaults SET data = ? WHERE uid = ? AND name = ?""",
+                (data, uid, name)
+            )
+        except sqlite3.IntegrityError:
+            raise Exception(f"Vault with name: {name} does not exist")

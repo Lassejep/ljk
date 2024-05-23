@@ -1,183 +1,215 @@
 import pickle
-from . import encryption, db
+import logging
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 
-async def register(websocket, email, mkey):
-    command = "register"
-    auth_key = encryption.hash_password(mkey)
-    salt = encryption.generate_salt()
-    user = {"email": email, "salt": salt, "auth_key": auth_key}
-    msg = pickle.dumps({"command": command, "user": user})
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def register_user(ws, msg, database, rhost, rport):
+    user = msg["user"]
+    try:
+        database.add_user(user["email"], user["salt"], user["auth_key"])
+        uid = database.get_id(user["email"])
+        logging.info(f"{rhost}:{rport} registered user:{uid}")
+        database.commit()
+        response = pickle.dumps({"status": "success"})
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back users database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+    await ws.send(response)
 
 
-async def auth(websocket, email, mkey):
-    msg = pickle.dumps({"command": "auth", "email": email, "mkey": mkey})
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return response["user"]
-    else:
-        return None
+async def auth(ws, msg, database, rhost, rport):
+    try:
+        uid = database.get_id(msg["email"])
+        auth_key = database.get_auth_key(uid)
+        if PasswordHasher().verify(auth_key, msg["mkey"]):
+            user = database.get_user(uid)
+            logging.info(f"{rhost}:{rport} authenticated user:{uid}")
+            response = pickle.dumps({"status": "success", "user": user})
+        else:
+            raise VerifyMismatchError
+    except VerifyMismatchError:
+        logging.error(
+            f"{rhost}:{rport} invalid password for user:{uid}"
+        )
+        response = pickle.dumps(
+            {"status": "failed", "error": "Invalid password"}
+        )
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        response = pickle.dumps(
+            {"status": "failed", "error": str(e)}
+        )
+    await ws.send(response)
 
 
-async def delete_account(websocket, user):
-    command = "delete_account"
-    uid = user["id"]
-    msg = pickle.dumps({"command": command, "uid": uid})
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def change_email(ws, msg, database, rhost, rport):
+    try:
+        database.update_email(msg["uid"], msg["new_email"])
+        database.commit()
+        logging.info(f"{rhost}:{rport} changed email for user:{msg['uid']}")
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def change_mkey(websocket, user, mkey, new_mkey):
-    vaults = await get_vaults(websocket, user)
-    for vault in vaults:
-        vault_name = vault["name"]
-        e_vkey = vault["key"]
-        dkey = encryption.create_data_key(mkey, user["salt"])
-        vkey = encryption.decrypt(e_vkey, dkey)
-        new_dkey = encryption.create_data_key(new_mkey, user["salt"])
-        new_e_vkey = encryption.encrypt(vkey, new_dkey)
-        if not await update_vault_key(websocket, user, vault_name, new_e_vkey):
-            return False
-    auth_key = encryption.hash_password(new_mkey)
-    msg = pickle.dumps({
-        "command": "change_auth_key", "uid": user["id"], "auth_key": auth_key
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def change_auth_key(ws, msg, database, rhost, rport):
+    try:
+        database.update_auth_key(msg["uid"], msg["auth_key"])
+        database.commit()
+        logging.info(
+            f"{rhost}:{rport} changed auth key for user:{msg['uid']}"
+        )
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def change_email(websocket, user, new_email):
-    msg = pickle.dumps({
-        "command": "change_email", "uid": user["id"], "new_email": new_email
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def get_vaults(ws, msg, database, rhost, rport):
+    try:
+        vaults = database.get_vaults(msg["uid"])
+        response = pickle.dumps({"status": "success", "vaults": vaults})
+        logging.info(f"{rhost}:{rport} received vaults for user:{msg['uid']}")
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+    await ws.send(response)
 
 
-async def get_vaults(websocket, user):
-    msg = pickle.dumps({"command": "get_vaults", "uid": user["id"]})
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "failed":
-        return None
-    vaults = response["vaults"]
-    return vaults
+async def get_vault(ws, msg, database, rhost, rport):
+    try:
+        vault = database.get_vault(msg["uid"], msg["vault_name"])
+        response = pickle.dumps({"status": "success", "vault": vault})
+        await ws.send(response)
+        logging.info(
+            f"{rhost}:{rport} received vault:{vault['id']}"
+        )
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
+        await ws.close()
 
 
-async def get_vault(websocket, user, vault_name, mkey):
-    msg = pickle.dumps({
-        "command": "get_vault", "uid": user["id"], "vault_name": vault_name
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "failed":
-        return None
-    vault = response["vault"]
-    dkey = encryption.create_data_key(mkey, user["salt"])
-    vkey = encryption.decrypt(vault["key"], dkey)
-    data = encryption.decrypt(vault["data"], vkey)
-    vault = db.Vault(vault_name, vkey)
-    vault.load(data)
-    return vault
+async def create_vault(ws, msg, database, rhost, rport):
+    try:
+        database.add_vault(
+            msg["uid"],
+            msg["vault_name"],
+            msg["vault_key"],
+            msg["vault_data"]
+        )
+        vault_id = database.get_vault_id(msg["uid"], msg["vault_name"])
+        logging.info(f"{rhost}:{rport} created vault:{vault_id}")
+        database.commit()
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def save_vault(websocket, user, vault):
-    vault_data = vault.dump()
-    e_vault = encryption.encrypt(vault_data, vault.key)
-    msg = pickle.dumps({
-        "command": "save_vault",
-        "uid": user["id"],
-        "vault_name": vault.name,
-        "data": e_vault
-    })
-    vault.load(vault_data)
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def update_vault_key(ws, msg, database, rhost, rport):
+    try:
+        database.update_vault_key(
+            msg["uid"],
+            msg["vault_name"],
+            msg["vault_key"]
+        )
+        database.commit()
+        vault_id = database.get_vault_id(msg["uid"], msg["vault_name"])
+        logging.info(f"{rhost}:{rport} updated vault key for vault:{vault_id}")
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def update_vault_key(websocket, user, vault_name, e_vkey):
-    msg = pickle.dumps({
-        "command": "update_vault_key",
-        "uid": user["id"],
-        "vault_name": vault_name,
-        "vault_key": e_vkey
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def delete_vault(ws, msg, database, rhost, rport):
+    try:
+        database.delete_vault(msg["uid"], msg["vault_name"])
+        database.commit()
+        logging.info(f"{rhost}:{rport} deleted vault:{msg['vault_name']}")
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def update_vault_name(websocket, user, vault_name, new_vault_name):
-    msg = pickle.dumps({
-        "command": "update_vault_name",
-        "uid": user["id"],
-        "vault_name": vault_name,
-        "new_vault_name": new_vault_name
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def invalid_command(ws, msg, rhost, rport):
+    logging.error(f"{rhost}:{rport} sent invalid command {msg['command']}")
+    response = pickle.dumps(
+        {"error": f"{rhost}:{rport} sent invalid command {msg['command']}"}
+    )
+    await ws.send(response)
+    await ws.close()
 
 
-async def delete_vault(websocket, user, vault_name):
-    msg = pickle.dumps({
-        "command": "delete_vault",
-        "uid": user["id"],
-        "vault_name": vault_name
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def save_vault(ws, msg, database, rhost, rport):
+    try:
+        database.update_vault(
+            msg["uid"],
+            msg["vault_name"],
+            msg["data"],
+        )
+        database.commit()
+        vault_id = database.get_vault_id(msg["uid"], msg["vault_name"])
+        logging.info(f"{rhost}:{rport} saved vault:{vault_id}")
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
 
 
-async def create_vault(websocket, user, vault_name, mkey):
-    vkey = encryption.generate_vault_key()
-    vault = db.Vault(vault_name, vkey)
-    dkey = encryption.create_data_key(mkey, user["salt"])
-    e_vkey = encryption.encrypt(vkey, dkey)
-    e_vault = encryption.encrypt(vault.dump(), vkey)
-    msg = pickle.dumps({
-        "command": "create_vault",
-        "uid": user["id"],
-        "vault_name": vault_name,
-        "vault_key": e_vkey,
-        "vault_data": e_vault
-    })
-    await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
-    if response["status"] == "success":
-        return True
-    else:
-        return False
+async def delete_account(ws, msg, database, rhost, rport):
+    try:
+        database.delete_user(msg["uid"])
+        database.commit()
+        logging.info(f"{rhost}:{rport} deleted user:{msg['uid']}")
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)
+
+
+async def update_vault_name(ws, msg, database, rhost, rport):
+    try:
+        database.update_vault_name(
+            msg["uid"],
+            msg["vault_name"],
+            msg["new_vault_name"]
+        )
+        database.commit()
+        logging.info(
+            f"{rhost}:{rport} changed vault name for user:{msg['uid']}"
+        )
+        response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except Exception as e:
+        logging.error(f"Error: {e}\nRolling back database")
+        database.rollback()
+        response = pickle.dumps({"status": "failed", "error": str(e)})
+        await ws.send(response)

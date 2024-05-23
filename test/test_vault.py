@@ -1,11 +1,11 @@
 import unittest
-from src import db, encryption
+from src import vault, encryption
 
 
 class TestVault(unittest.TestCase):
     def setUp(self):
         self.vault_key = encryption.generate_vault_key()
-        self.vault = db.Vault("test", self.vault_key)
+        self.vault = vault.Vault("test", self.vault_key)
         self.vault.add(
             "test_service", "test_user", "test_password", "test_notes"
         )
@@ -94,7 +94,7 @@ class TestVault(unittest.TestCase):
 
     def test_load(self):
         data = self.vault.dump()
-        vault = db.Vault("test", self.vault_key)
+        vault = vault.Vault("test", self.vault_key)
         self.assertNotEqual(vault.services(), self.vault.services())
         vault.load(data)
         self.assertEqual(vault.name, "test")

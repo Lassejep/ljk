@@ -11,3 +11,7 @@ __pycache__
 
 .env
 data.db
+users.db
+
+vaults/*
+logs/*

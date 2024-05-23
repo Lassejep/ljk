@@ -2,7 +2,7 @@ import pyperclip
 import curses
 import sys
 import re
-from . import handlers
+from . import client
 from .encryption import generate_password
 
 
@@ -72,7 +72,7 @@ class Console:
         if self.vault is not None:
             self.message("INFO: Saving vault")
             self.vault.commit()
-            await handlers.save_vault(self.ws, self.user, self.vault)
+            await client.save_vault(self.ws, self.user, self.vault)
             self.vault.rm()
         self.message("INFO: Exiting")
         curses.echo()
@@ -217,7 +217,7 @@ class Console:
         self.mkey = await self.get_input(
             self.window, self.start_menu, secret=True
         )
-        self.user = await handlers.auth(self.ws, self.email, self.mkey)
+        self.user = await client.auth(self.ws, self.email, self.mkey)
         if self.user is None:
             return self.message(
                 "ERROR: Failed to log in", self.error_color
@@ -251,13 +251,13 @@ class Console:
                 "ERROR: Passwords do not match", self.error_color
             )
             return await self.account_register()
-        if not await handlers.register(self.ws, self.email, self.mkey):
+        if not await client.register(self.ws, self.email, self.mkey):
             self.message(
                 "ERROR: Failed to register", self.error_color
             )
             return await self.account_register()
         self.message("INFO: Registered")
-        self.user = await handlers.auth(self.ws, self.email, self.mkey)
+        self.user = await client.auth(self.ws, self.email, self.mkey)
         if self.user is None:
             self.message("ERROR: Failed to log in", self.error_color)
             return await self.account_auth()
@@ -375,7 +375,7 @@ class Console:
         hline = curses.ACS_HLINE
         vline = curses.ACS_VLINE
         key = f"{y_offset}"
-        vaults = await handlers.get_vaults(self.ws, self.user)
+        vaults = await client.get_vaults(self.ws, self.user)
         while self.escape(key) is False:
             if vaults is None:
                 vaults = []
@@ -399,18 +399,18 @@ class Console:
             key = self.window.getkey()
             if key == "A":
                 await self.vault_create()
-                vaults = await handlers.get_vaults(self.ws, self.user)
+                vaults = await client.get_vaults(self.ws, self.user)
             if key == "D":
                 if vault is not None:
                     await self.vault_delete(vault["name"])
-                    vaults = await handlers.get_vaults(self.ws, self.user)
+                    vaults = await client.get_vaults(self.ws, self.user)
             if key == "R":
                 if vault is not None:
                     await self.vault_rename(vault)
-                    vaults = await handlers.get_vaults(self.ws, self.user)
+                    vaults = await client.get_vaults(self.ws, self.user)
             if key == "\n":
                 if vault is not None:
-                    self.vault = await handlers.get_vault(
+                    self.vault = await client.get_vault(
                         self.ws, self.user, vault["name"], self.mkey
                     )
                     if self.vault is None:
@@ -468,7 +468,7 @@ class Console:
         self.widget.addstr(1, 1, name_field)
         self.widget.move(1, len(name_field) + 1)
         vault_name = await self.get_input(self.widget, self.vault_window)
-        if not await handlers.create_vault(
+        if not await client.create_vault(
             self.ws, self.user, vault_name, self.mkey
         ):
             self.message(
@@ -487,7 +487,7 @@ class Console:
             return self.message(
                 "ERROR: Vault not deleted", self.error_color
             )
-        if not await handlers.delete_vault(self.ws, self.user, vault_name):
+        if not await client.delete_vault(self.ws, self.user, vault_name):
             return self.message(
                 "ERROR: Failed to delete vault", self.error_color
             )
@@ -508,7 +508,7 @@ class Console:
         if new_name == "":
             self.message("ERROR: Invalid name", self.error_color)
             return self.redraw(self.widget, box=False)
-        if not await handlers.update_vault_name(
+        if not await client.update_vault_name(
             self.ws, self.user, vault["name"], new_name
         ):
             self.message(
@@ -566,7 +566,7 @@ class Console:
         )
         self.vault.add(service, username, password, notes)
         self.vault.commit()
-        await handlers.save_vault(self.ws, self.user, self.vault)
+        await client.save_vault(self.ws, self.user, self.vault)
         self.message("INFO: Service added")
 
     async def service_delete(self, service_id):
@@ -580,7 +580,7 @@ class Console:
             )
         self.vault.delete(service_id)
         self.vault.commit()
-        await handlers.save_vault(self.ws, self.user, self.vault)
+        await client.save_vault(self.ws, self.user, self.vault)
         self.message("INFO: Entry deleted")
 
     async def service_edit(self, service_id):
@@ -635,7 +635,7 @@ class Console:
             )
         self.vault.update(service_id, service, username, password, notes)
         self.vault.commit()
-        await handlers.save_vault(self.ws, self.user, self.vault)
+        await client.save_vault(self.ws, self.user, self.vault)
         self.message("INFO: Service updated")
 
     async def search_services(self, search=""):
@@ -683,7 +683,7 @@ class Console:
                 "ERROR: Passwords do not match", self.error_color
             )
             return await self.account_change_mkey()
-        if not await handlers.change_mkey(
+        if not await client.change_mkey(
             self.ws, self.user, current, new
         ):
             self.message(
@@ -700,7 +700,7 @@ class Console:
         self.widget.addstr(1, 1, email_field)
         self.widget.move(1, len(email_field) + 1)
         new_email = await self.get_input(self.widget, self.settings_window)
-        if not await handlers.change_email(self.ws, self.user, new_email):
+        if not await client.change_email(self.ws, self.user, new_email):
             self.message(
                 "ERROR: Failed to change email", self.error_color
             )
@@ -720,7 +720,7 @@ class Console:
             return self.message(
                 "ERROR: Account not deleted", self.error_color
             )
-        if not await handlers.delete_account(self.ws, self.user):
+        if not await client.delete_account(self.ws, self.user):
             return self.message(
                 "ERROR: Failed to delete account", self.error_color
             )

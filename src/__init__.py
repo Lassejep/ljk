@@ -1,2 +1,2 @@
-from . import encryption, db, handlers, console
-__all__ = ["encryption", "db", "handlers", "console"]
+from . import encryption, vault, client, console, db, handlers
+__all__ = ["encryption", "vault", "client", "console", "db", "handlers"]
