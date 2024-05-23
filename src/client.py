@@ -1,5 +1,6 @@
 import pickle
-from . import encryption, vault
+from . import encryption
+from .vault import Vault
 
 
 async def register(websocket, email, mkey):
@@ -95,7 +96,7 @@ async def get_vault(websocket, user, vault_name, mkey):
     dkey = encryption.create_data_key(mkey, user["salt"])
     vkey = encryption.decrypt(vault["key"], dkey)
     data = encryption.decrypt(vault["data"], vkey)
-    vault = vault.Vault(vault_name, vkey)
+    vault = Vault(vault_name, vkey)
     vault.load(data)
     return vault
 
@@ -164,7 +165,7 @@ async def delete_vault(websocket, user, vault_name):
 
 async def create_vault(websocket, user, vault_name, mkey):
     vkey = encryption.generate_vault_key()
-    vault = vault.Vault(vault_name, vkey)
+    vault = Vault(vault_name, vkey)
     dkey = encryption.create_data_key(mkey, user["salt"])
     e_vkey = encryption.encrypt(vkey, dkey)
     e_vault = encryption.encrypt(vault.dump(), vkey)
