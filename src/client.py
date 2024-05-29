@@ -3,11 +3,11 @@ from . import encryption
 from .vault import Vault
 
 
-async def register(websocket, email, mkey):
+async def register(websocket, email, mpass):
     command = "register"
-    auth_key = encryption.hash_password(mkey)
-    salt = encryption.generate_salt()
-    user = {"email": email, "salt": salt, "auth_key": auth_key}
+    dkey = encryption.create_dkey(mpass, email)
+    mkey = encryption.create_mkey(mpass, dkey)
+    user = {"email": email, "mkey": mkey}
     msg = pickle.dumps({"command": command, "user": user})
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
@@ -17,20 +17,25 @@ async def register(websocket, email, mkey):
         return False
 
 
-async def auth(websocket, email, mkey):
+async def auth(websocket, email, mpass):
+    dkey = encryption.create_dkey(mpass, email)
+    mkey = encryption.create_mkey(mpass, dkey)
     msg = pickle.dumps({"command": "auth", "email": email, "mkey": mkey})
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
     if response["status"] == "success":
-        return response["user"]
+        user = response["user"]
+        user["dkey"] = dkey
+        return user
     else:
         return None
 
 
-async def delete_account(websocket, user):
+async def delete_account(websocket, user, mpass):
     command = "delete_account"
     uid = user["id"]
-    msg = pickle.dumps({"command": command, "uid": uid})
+    mkey = encryption.create_mkey(mpass, user["dkey"])
+    msg = pickle.dumps({"command": command, "uid": uid, "mkey": mkey})
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
     if response["status"] == "success":
@@ -39,20 +44,24 @@ async def delete_account(websocket, user):
         return False
 
 
-async def change_mkey(websocket, user, mkey, new_mkey):
+async def change_mkey(websocket, user, mpass, new_mpass):
+    if await auth(websocket, user["email"], mpass) is None:
+        return False
     vaults = await get_vaults(websocket, user)
-    for vault in vaults:
-        vault_name = vault["name"]
-        e_vkey = vault["key"]
-        dkey = encryption.create_data_key(mkey, user["salt"])
-        vkey = encryption.decrypt(e_vkey, dkey)
-        new_dkey = encryption.create_data_key(new_mkey, user["salt"])
-        new_e_vkey = encryption.encrypt(vkey, new_dkey)
-        if not await update_vault_key(websocket, user, vault_name, new_e_vkey):
-            return False
-    auth_key = encryption.hash_password(new_mkey)
+    new_dkey = encryption.create_dkey(new_mpass, user["email"])
+    new_mkey = encryption.create_mkey(new_mpass, new_dkey)
+    if vaults is not None:
+        for vault in vaults:
+            vault_name = vault["name"]
+            e_vkey = vault["key"]
+            vkey = encryption.decrypt(e_vkey, user["dkey"])
+            new_e_vkey = encryption.encrypt(vkey, new_dkey)
+            if not await update_vault_key(
+                websocket, user, vault_name, new_e_vkey
+            ):
+                return False
     msg = pickle.dumps({
-        "command": "change_auth_key", "uid": user["id"], "auth_key": auth_key
+        "command": "change_auth_key", "uid": user["id"], "new_mkey": new_mkey
     })
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
@@ -62,9 +71,23 @@ async def change_mkey(websocket, user, mkey, new_mkey):
         return False
 
 
-async def change_email(websocket, user, new_email):
+async def change_email(websocket, user, new_email, mpass):
+    if await auth(websocket, user["email"], mpass) is None:
+        return False
+    new_dkey = encryption.create_dkey(mpass, new_email)
+    new_mkey = encryption.create_mkey(mpass, new_dkey)
+    vaults = await get_vaults(websocket, user)
+    if vaults is not None:
+        for vault in vaults:
+            vault_name = vault["name"]
+            e_vkey = vault["key"]
+            vkey = encryption.decrypt(e_vkey, user["dkey"])
+            e_vkey = encryption.encrypt(vkey, new_dkey)
+            if not await update_vault_key(websocket, user, vault_name, e_vkey):
+                return False
     msg = pickle.dumps({
-        "command": "change_email", "uid": user["id"], "new_email": new_email
+        "command": "change_email", "uid": user["id"], "new_email": new_email,
+        "new_mkey": new_mkey
     })
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
@@ -84,7 +107,7 @@ async def get_vaults(websocket, user):
     return vaults
 
 
-async def get_vault(websocket, user, vault_name, mkey):
+async def get_vault(websocket, user, vault_name):
     msg = pickle.dumps({
         "command": "get_vault", "uid": user["id"], "vault_name": vault_name
     })
@@ -93,8 +116,7 @@ async def get_vault(websocket, user, vault_name, mkey):
     if response["status"] == "failed":
         return None
     vault = response["vault"]
-    dkey = encryption.create_data_key(mkey, user["salt"])
-    vkey = encryption.decrypt(vault["key"], dkey)
+    vkey = encryption.decrypt(vault["key"], user["dkey"])
     data = encryption.decrypt(vault["data"], vkey)
     vault = Vault(vault_name, vkey)
     vault.load(data)
@@ -163,11 +185,10 @@ async def delete_vault(websocket, user, vault_name):
         return False
 
 
-async def create_vault(websocket, user, vault_name, mkey):
+async def create_vault(websocket, user, vault_name):
     vkey = encryption.generate_vault_key()
     vault = Vault(vault_name, vkey)
-    dkey = encryption.create_data_key(mkey, user["salt"])
-    e_vkey = encryption.encrypt(vkey, dkey)
+    e_vkey = encryption.encrypt(vkey, user["dkey"])
     e_vault = encryption.encrypt(vault.dump(), vkey)
     msg = pickle.dumps({
         "command": "create_vault",

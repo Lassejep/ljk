@@ -1,9 +1,5 @@
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+import argon2
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from string import ascii_letters, digits, punctuation
 from secrets import choice, randbits
 
@@ -17,13 +13,13 @@ def generate_password(password_length=16):
 
 
 def hash_password(password):
-    return PasswordHasher().hash(password)
+    return argon2.PasswordHasher().hash(password)
 
 
 def verify_password(password, hash):
     try:
-        return PasswordHasher().verify(hash, password)
-    except VerifyMismatchError:
+        return argon2.PasswordHasher().verify(hash, password)
+    except argon2.exceptions.VerifyMismatchError:
         return False
     except Exception as e:
         print(e)
@@ -34,19 +30,32 @@ def generate_vault_key():
     return AESGCM.generate_key(bit_length=256)
 
 
-def generate_salt():
-    return randbits(256).to_bytes(32, "big")
-
-
-def create_data_key(password, salt):
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-        backend=default_backend()
+def create_mkey(password, dkey):
+    salt = dkey
+    kdf = argon2.PasswordHasher(
+        time_cost=16,
+        memory_cost=65536,
+        parallelism=8,
+        hash_len=32,
+        salt_len=32
     )
-    return kdf.derive(password.encode())
+    hash = kdf.hash(password, salt=salt)
+    return hash[-32:].encode()
+
+
+def create_dkey(password, username):
+    if len(username) < 8:
+        raise ValueError("Username must be at least 8 characters long")
+    salt = username.encode()
+    kdf = argon2.PasswordHasher(
+        time_cost=16,
+        memory_cost=65536,
+        parallelism=8,
+        hash_len=32,
+        salt_len=len(salt)
+    )
+    hash = kdf.hash(password, salt=salt)
+    return hash[-32:].encode()
 
 
 def encrypt(plaintext, key, associated_data=None):

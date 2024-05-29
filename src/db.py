@@ -10,7 +10,6 @@ class Database:
             """CREATE TABLE IF NOT EXISTS users(
                 id INTEGER PRIMARY KEY,
                 email TEXT NOT NULL UNIQUE,
-                salt BYTES NOT NULL,
                 auth_key BYTES NOT NULL
             )"""
         )
@@ -32,13 +31,13 @@ class Database:
     def rollback(self):
         self.connection.rollback()
 
-    def add_user(self, email, salt, auth_key):
+    def add_user(self, email, auth_key):
         try:
             self.cursor.execute(
                 """INSERT INTO users(
-                    email, salt, auth_key
-                ) VALUES (?, ?, ?)""",
-                (email, salt, auth_key)
+                    email, auth_key
+                ) VALUES (?, ?)""",
+                (email, auth_key)
             )
         except sqlite3.IntegrityError:
             raise Exception(f"User with email: {email} already exists")
@@ -60,17 +59,16 @@ class Database:
             return {
                 "id": user[0],
                 "email": user[1],
-                "salt": user[2],
-                "auth_key": user[3],
+                "auth_key": user[2],
             }
         else:
             raise Exception(f"User with id: {uid} not found")
 
-    def update_email(self, uid, new_email):
+    def update_email(self, uid, new_email, new_auth_key):
         try:
             self.cursor.execute(
-                """UPDATE users SET email = ? WHERE id = ?""",
-                (new_email, uid)
+                """UPDATE users SET email = ?, auth_key = ? WHERE id = ?""",
+                (new_email, new_auth_key, uid)
             )
         except sqlite3.IntegrityError:
             raise Exception(f"User with email: {new_email} already exists")
@@ -93,10 +91,6 @@ class Database:
             return id[0]
         else:
             raise Exception(f"User with email: {email} not found")
-
-    def get_salt(self, uid):
-        user = self.get_user(uid)
-        return user["salt"]
 
     def get_auth_key(self, uid):
         self.cursor.execute(

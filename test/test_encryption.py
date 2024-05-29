@@ -28,15 +28,19 @@ class TestEncryption(unittest.TestCase):
         key = encryption.generate_vault_key()
         self.assertEqual(len(key), 32)
 
-    def test_generate_salt(self):
-        salt = encryption.generate_salt()
-        self.assertEqual(len(salt), 32)
-
-    def test_create_data_key(self):
+    def test_create_dkey(self):
         password = "test_password"
-        salt = encryption.generate_salt()
-        data_key = encryption.create_data_key(password, salt)
-        self.assertEqual(len(data_key), 32)
+        username = "test_username"
+        dkey = encryption.create_dkey(password, username)
+        self.assertNotEqual(password, dkey)
+
+    def test_create_mkey(self):
+        password = "test_password"
+        username = "test_username"
+        dkey = encryption.create_dkey(password, username)
+        mkey = encryption.create_mkey(password, dkey)
+        self.assertNotEqual(password, mkey)
+        self.assertNotEqual(dkey, mkey)
 
     def test_encrypt(self):
         key = encryption.generate_vault_key()

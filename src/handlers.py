@@ -7,7 +7,8 @@ from argon2.exceptions import VerifyMismatchError
 async def register_user(ws, msg, database, rhost, rport):
     user = msg["user"]
     try:
-        database.add_user(user["email"], user["salt"], user["auth_key"])
+        auth_key = PasswordHasher().hash(user["mkey"])
+        database.add_user(user["email"], auth_key)
         uid = database.get_id(user["email"])
         logging.info(f"{rhost}:{rport} registered user:{uid}")
         database.commit()
@@ -46,7 +47,8 @@ async def auth(ws, msg, database, rhost, rport):
 
 async def change_email(ws, msg, database, rhost, rport):
     try:
-        database.update_email(msg["uid"], msg["new_email"])
+        new_auth_key = PasswordHasher().hash(msg["new_mkey"])
+        database.update_email(msg["uid"], msg["new_email"], new_auth_key)
         database.commit()
         logging.info(f"{rhost}:{rport} changed email for user:{msg['uid']}")
         response = pickle.dumps({"status": "success"})
@@ -60,7 +62,8 @@ async def change_email(ws, msg, database, rhost, rport):
 
 async def change_auth_key(ws, msg, database, rhost, rport):
     try:
-        database.update_auth_key(msg["uid"], msg["auth_key"])
+        new_auth_key = PasswordHasher().hash(msg["new_mkey"])
+        database.update_auth_key(msg["uid"], new_auth_key)
         database.commit()
         logging.info(
             f"{rhost}:{rport} changed auth key for user:{msg['uid']}"
@@ -183,10 +186,23 @@ async def save_vault(ws, msg, database, rhost, rport):
 
 async def delete_account(ws, msg, database, rhost, rport):
     try:
+        if not PasswordHasher().verify(
+            database.get_auth_key(msg["uid"]),
+            msg["mkey"]
+        ):
+            raise VerifyMismatchError
         database.delete_user(msg["uid"])
         database.commit()
         logging.info(f"{rhost}:{rport} deleted user:{msg['uid']}")
         response = pickle.dumps({"status": "success"})
+        await ws.send(response)
+    except VerifyMismatchError:
+        logging.error(
+            f"{rhost}:{rport} invalid password for user:{msg['uid']}"
+        )
+        response = pickle.dumps(
+            {"status": "failed", "error": "Invalid password"}
+        )
         await ws.send(response)
     except Exception as e:
         logging.error(f"Error: {e}\nRolling back database")

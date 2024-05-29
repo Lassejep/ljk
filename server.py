@@ -123,7 +123,7 @@ if __name__ == "__main__":
         ssl_context = None
         logging.basicConfig(
             filename=f"{current_dir}/test.log",
-            level=logging.ERROR,
+            level=logging.INFO,
             format="%(asctime)s %(levelname)s %(message)s"
         )
     else:

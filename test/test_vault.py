@@ -94,12 +94,12 @@ class TestVault(unittest.TestCase):
 
     def test_load(self):
         data = self.vault.dump()
-        vault = vault.Vault("test", self.vault_key)
-        self.assertNotEqual(vault.services(), self.vault.services())
-        vault.load(data)
-        self.assertEqual(vault.name, "test")
-        self.assertEqual(vault.key, self.vault_key)
-        self.assertEqual(vault.services(), self.vault.services())
+        testvault = vault.Vault("test", self.vault_key)
+        self.assertNotEqual(testvault.services(), self.vault.services())
+        testvault.load(data)
+        self.assertEqual(testvault.name, "test")
+        self.assertEqual(testvault.key, self.vault_key)
+        self.assertEqual(testvault.services(), self.vault.services())
 
     def tearDown(self):
         self.vault.rm()

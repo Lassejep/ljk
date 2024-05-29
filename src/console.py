@@ -9,8 +9,6 @@ from .encryption import generate_password
 class Console:
     def __init__(self, ws):
         self.ws = ws
-        self.email = None
-        self.mkey = None
         self.user = None
         self.vault = None
 
@@ -212,12 +210,24 @@ class Console:
         self.window.addstr(2, 1, email_field)
         self.window.addstr(3, 1, password_field)
         self.window.move(2, len(email_field) + 1)
-        self.email = await self.get_input(self.window, self.start_menu)
+        email = await self.get_input(self.window, self.start_menu)
+        if len(email) < 8:
+            self.message(
+                "ERROR: Email must be at least 8 characters long",
+                self.error_color
+            )
+            return await self.account_auth()
         self.window.move(3, len(password_field) + 1)
-        self.mkey = await self.get_input(
+        mpass = await self.get_input(
             self.window, self.start_menu, secret=True
         )
-        self.user = await client.auth(self.ws, self.email, self.mkey)
+        if len(mpass) < 16:
+            self.message(
+                "ERROR: Password must be at least 16 characters long",
+                self.error_color
+            )
+            return await self.account_auth()
+        self.user = await client.auth(self.ws, email, mpass)
         if self.user is None:
             return self.message(
                 "ERROR: Failed to log in", self.error_color
@@ -237,27 +247,39 @@ class Console:
         self.window.addstr(2, 1, password_field)
         self.window.addstr(3, 1, confirm_field)
         self.window.move(1, len(email_field) + 1)
-        self.email = await self.get_input(self.window, self.start_menu)
+        email = await self.get_input(self.window, self.start_menu)
+        if len(email) < 8:
+            self.message(
+                "ERROR: Email must be at least 8 characters long",
+                self.error_color
+            )
+            return await self.account_register()
         self.window.move(2, len(password_field) + 1)
-        self.mkey = await self.get_input(
+        mpass = await self.get_input(
             self.window, self.start_menu, secret=True
         )
+        if len(mpass) < 16:
+            self.message(
+                "ERROR: Password must be at least 16 characters long",
+                self.error_color
+            )
+            return await self.account_register()
         self.window.move(3, len(confirm_field) + 1)
         confirm_pass = await self.get_input(
             self.window, self.start_menu, secret=True
         )
-        if self.mkey != confirm_pass:
+        if mpass != confirm_pass:
             self.message(
                 "ERROR: Passwords do not match", self.error_color
             )
             return await self.account_register()
-        if not await client.register(self.ws, self.email, self.mkey):
+        if not await client.register(self.ws, email, mpass):
             self.message(
                 "ERROR: Failed to register", self.error_color
             )
             return await self.account_register()
         self.message("INFO: Registered")
-        self.user = await client.auth(self.ws, self.email, self.mkey)
+        self.user = await client.auth(self.ws, email, mpass)
         if self.user is None:
             self.message("ERROR: Failed to log in", self.error_color)
             return await self.account_auth()
@@ -411,7 +433,7 @@ class Console:
             if key == "\n":
                 if vault is not None:
                     self.vault = await client.get_vault(
-                        self.ws, self.user, vault["name"], self.mkey
+                        self.ws, self.user, vault["name"]
                     )
                     if self.vault is None:
                         self.message(
@@ -452,8 +474,6 @@ class Console:
         return await self.main_menu()
 
     async def account_logout(self):
-        self.email = None
-        self.mkey = None
         self.user = None
         self.vault = None
         self.screen.clear()
@@ -469,7 +489,7 @@ class Console:
         self.widget.move(1, len(name_field) + 1)
         vault_name = await self.get_input(self.widget, self.vault_window)
         if not await client.create_vault(
-            self.ws, self.user, vault_name, self.mkey
+            self.ws, self.user, vault_name
         ):
             self.message(
                 "ERROR: Failed to create vault", self.error_color
@@ -667,51 +687,69 @@ class Console:
         self.widget.addstr(2, 1, new_field)
         self.widget.addstr(3, 1, confirm_field)
         self.widget.move(1, len(current_field) + 1)
-        current = await self.get_input(
+        mpass = await self.get_input(
             self.widget, self.settings_window, secret=True
         )
         self.widget.move(2, len(new_field) + 1)
-        new = await self.get_input(
+        n_mpass = await self.get_input(
             self.widget, self.settings_window, secret=True
         )
         self.widget.move(3, len(confirm_field) + 1)
         confirm = await self.get_input(
             self.widget, self.settings_window, secret=True
         )
-        if new != confirm:
+        if n_mpass != confirm:
             self.message(
                 "ERROR: Passwords do not match", self.error_color
             )
             return await self.account_change_mkey()
         if not await client.change_mkey(
-            self.ws, self.user, current, new
+            self.ws, self.user, mpass, n_mpass
         ):
             self.message(
                 "ERROR: Failed to change password", self.error_color
             )
             return await self.account_change_mkey()
-        self.mkey = new
         self.message("INFO: Password changed")
 
     async def account_change_email(self):
         self.redraw(self.widget)
         self.widget.addstr(0, 1, "Change email")
         email_field = "New email: "
+        password_field = "Master password: "
         self.widget.addstr(1, 1, email_field)
+        self.widget.addstr(2, 1, password_field)
         self.widget.move(1, len(email_field) + 1)
         new_email = await self.get_input(self.widget, self.settings_window)
-        if not await client.change_email(self.ws, self.user, new_email):
+        if len(new_email) < 8:
+            self.message(
+                "ERROR: Email must be at least 8 characters long",
+                self.error_color
+            )
+            return await self.account_change_email()
+        self.widget.move(2, len(password_field) + 1)
+        mpass = await self.get_input(
+            self.widget, self.settings_window, secret=True
+        )
+        if not await client.change_email(self.ws, self.user, new_email, mpass):
             self.message(
                 "ERROR: Failed to change email", self.error_color
             )
             return await self.account_change_email()
-        self.email = new_email
         self.message("INFO: Email changed")
 
     async def account_delete(self):
+        self.redraw(self.msgbox)
+        password_field = "Master password: "
         message = (
             "CONFIRMATION: Are you sure you want to delete your account? (y/N)"
         )
+        self.msgbox.addstr(1, 1, password_field)
+        self.msgbox.move(1, len(password_field) + 1)
+        mpass = await self.get_input(
+            self.msgbox, self.settings_window, secret=True
+        )
+        self.redraw(self.msgbox)
         self.msgbox.addstr(1, 1, message, self.hl_color)
         self.msgbox.move(1, len(message) + 1)
         self.msgbox.refresh()
@@ -720,13 +758,11 @@ class Console:
             return self.message(
                 "ERROR: Account not deleted", self.error_color
             )
-        if not await client.delete_account(self.ws, self.user):
+        if not await client.delete_account(self.ws, self.user, mpass):
             return self.message(
                 "ERROR: Failed to delete account", self.error_color
             )
         self.message("INFO: Account deleted")
-        self.email = None
-        self.mkey = None
         self.user = None
         self.vault = None
         self.redraw(self.window)
