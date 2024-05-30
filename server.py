@@ -5,6 +5,7 @@ import pickle
 import pathlib
 import ssl
 import argparse
+import functools
 from websockets.server import serve
 from websockets.exceptions import ConnectionClosedOK
 from datetime import datetime
@@ -12,8 +13,8 @@ from os import path, mkdir
 from src import db, handlers
 
 
-async def handler(ws):
-    database = db.Database(path_to_database)
+async def handler(ws, db_path):
+    database = db.Database(db_path)
     lhost, lport = ws.local_address
     logging.info(f"Connected to {lhost}:{lport}")
     while True:
@@ -62,9 +63,11 @@ async def handler(ws):
                 await handlers.invalid_command(ws, msg, rhost, rport)
 
 
-async def main(host="0.0.0.0", port=8765, ssl_context=None):
-    print(f"Listening on {args.host}:{args.port}")
-    print(f"Database File: {args.database}")
+async def main(
+        host="0.0.0.0", port=8765, ssl_context=None, db_path="users.db"
+):
+    print(f"Listening on {host}:{port}")
+    print(f"Database File: {db_path}")
     print(f"Log File: {logging.getLogger().handlers[0].baseFilename}")
     if ssl_context is not None:
         print("SSL enabled")
@@ -72,8 +75,10 @@ async def main(host="0.0.0.0", port=8765, ssl_context=None):
         print("SSL disabled")
     print("Press Ctrl+C to stop")
 
+    bound_handler = functools.partial(handler, db_path=db_path)
+
     async with serve(
-        handler, host, port,
+        bound_handler, host, port,
         logger=logging.getLogger(),
         ssl=ssl_context,
         ping_interval=None
@@ -143,7 +148,9 @@ if __name__ == "__main__":
 
     while True:
         try:
-            asyncio.run(main(args.host, args.port, ssl_context))
+            asyncio.run(
+                main(args.host, args.port, ssl_context, path_to_database)
+            )
         except KeyboardInterrupt:
             print("Stopping server")
             break
