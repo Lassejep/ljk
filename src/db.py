@@ -77,13 +77,11 @@ class Database:
             raise Exception(f"User with email: {new_email} already exists")
 
     def update_auth_key(self, uid, auth_key):
-        try:
-            self.cursor.execute(
-                """UPDATE users SET auth_key = ? WHERE id = ?""",
-                (auth_key, uid)
-            )
-        except sqlite3.IntegrityError:
-            raise Exception(f"User with id: {uid} does not exist")
+        self.get_user(uid)
+        self.cursor.execute(
+            """UPDATE users SET auth_key = ? WHERE id = ?""",
+            (auth_key, uid)
+        )
 
     def get_id(self, email):
         self.cursor.execute(
@@ -175,28 +173,39 @@ class Database:
         return vault["id"]
 
     def update_vault_name(self, uid, name, new_name):
+        if new_name.strip() == "":
+            raise Exception("Vault name cannot be empty")
+        if name == new_name:
+            return
+        self.get_vault(uid, name)
         try:
-            self.cursor.execute(
-                """UPDATE vaults SET name = ? WHERE uid = ? AND name = ?""",
-                (new_name, uid, name)
-            )
-        except sqlite3.IntegrityError:
+            self.get_vault(uid, new_name)
             raise Exception(f"Vault with name: {new_name} already exists")
+        except Exception:
+            pass
+        self.cursor.execute(
+            """UPDATE vaults SET name = ? WHERE uid = ? AND name = ?""",
+            (new_name, uid, name)
+        )
 
     def update_vault_key(self, uid, name, key):
-        try:
-            self.cursor.execute(
-                """UPDATE vaults SET key = ? WHERE uid = ? AND name = ?""",
-                (key, uid, name)
-            )
-        except sqlite3.IntegrityError:
-            raise Exception(f"Vault with name: {name} does not exist")
+        if key.strip() == "":
+            raise Exception("Vault key cannot be empty")
+        if self.get_vault_key(uid, name) == key:
+            return
+        self.get_vault(uid, name)
+        self.cursor.execute(
+            """UPDATE vaults SET key = ? WHERE uid = ? AND name = ?""",
+            (key, uid, name)
+        )
 
     def update_vault(self, uid, name, data):
-        try:
-            self.cursor.execute(
-                """UPDATE vaults SET data = ? WHERE uid = ? AND name = ?""",
-                (data, uid, name)
-            )
-        except sqlite3.IntegrityError:
-            raise Exception(f"Vault with name: {name} does not exist")
+        if data.strip() == "":
+            raise Exception("Vault data cannot be empty")
+        if self.get_vault_data(uid, name) == data:
+            return
+        self.get_vault(uid, name)
+        self.cursor.execute(
+            """UPDATE vaults SET data = ? WHERE uid = ? AND name = ?""",
+            (data, uid, name)
+        )
