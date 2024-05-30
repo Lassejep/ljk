@@ -31,6 +31,9 @@ class Database:
     def rollback(self):
         self.connection.rollback()
 
+    def close(self):
+        self.connection.close()
+
     def add_user(self, email, auth_key):
         try:
             self.cursor.execute(
