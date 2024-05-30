@@ -104,41 +104,23 @@ if __name__ == "__main__":
         default=path.join(current_dir, "logs"),
         help="Path to the log directory"
     )
-    parser.add_argument(
-        "-t", "--test",
-        action="store_true",
-        default=False,
-        help="Enable test mode"
-    )
     args = parser.parse_args()
 
-    if args.test:
-        path_to_database = "/tmp/test.db"
-        args.host = "0.0.0.0"
-        args.port = 8765
-        ssl_context = None
-        logging.basicConfig(
-            filename=f"{current_dir}/test.log",
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s %(message)s"
-        )
-    else:
-        path_to_database = args.database
-        if args.ssl is None:
-            args.ssl = path.join(current_dir, "localhost.pem")
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(args.ssl)
-        timestamp = datetime.now().strftime("%Y-%m-%d")
-        if not path.exists(args.log_dir):
-            mkdir(args.log_dir)
-        logging.basicConfig(
-            filename=f"{args.log_dir}/{timestamp}.log",
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s %(message)s"
-        )
+    if args.ssl is None:
+        args.ssl = path.join(current_dir, "localhost.pem")
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(args.ssl)
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    if not path.exists(args.log_dir):
+        mkdir(args.log_dir)
+    logging.basicConfig(
+        filename=f"{args.log_dir}/{timestamp}.log",
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     print(f"Listening on {args.host}:{args.port}")
-    print(f"Database File: {path_to_database}")
+    print(f"Database File: {args.database}")
     print(f"Log File: {logging.getLogger().handlers[0].baseFilename}")
     if ssl_context is not None:
         print("SSL enabled")
@@ -148,9 +130,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            asyncio.run(
-                main(args.host, args.port, ssl_context, path_to_database)
-            )
+            asyncio.run(main(args.host, args.port, ssl_context, args.database))
         except KeyboardInterrupt:
             print("Stopping server")
             break
