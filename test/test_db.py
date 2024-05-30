@@ -149,7 +149,8 @@ class TestDB(unittest.TestCase):
         self.assertIsNotNone(vault)
         self.assertEqual(vault["name"], "new_vault")
         self.assertRaises(
-            Exception, self.db.update_vault_name, id, "test_vault_2", "new_vault"
+            Exception, self.db.update_vault_name, id,
+            "test_vault_2", "new_vault"
         )
 
     def test_update_vault_key(self):
