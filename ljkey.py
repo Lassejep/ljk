@@ -4,12 +4,13 @@ import websockets
 import asyncio
 import curses
 from src import console
+import pathlib
 
 
 async def main():
     # TODO: Use a real certificate
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    localhost_pem = "/home/tinspring/ws/ljk_server/localhost.pem"
+    localhost_pem = pathlib.Path(__file__).with_name("localhost.pem")
     ssl_context.load_verify_locations(localhost_pem)
 
     async with websockets.connect(
