@@ -1,12 +1,21 @@
 import unittest
 import os
 import websockets
+import logging
+import asyncio
+import server
 from src import encryption, client
 
 
 class TestClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.db_path = "/tmp/test.db"
+        self.db_path = "test.db"
+        logging.basicConfig(
+            filename="test.log",
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        self.server = asyncio.create_task(server.main(db_path=self.db_path))
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
         self.ws = await websockets.connect(
@@ -129,6 +138,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(status)
 
     async def asyncTearDown(self):
+        self.server.cancel()
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
         await self.ws.close()
