@@ -159,7 +159,9 @@ async def delete_vault(ws, msg, database, rhost, rport):
 async def invalid_command(ws, msg, rhost, rport):
     logging.error(f"{rhost}:{rport} sent invalid command {msg['command']}")
     response = pickle.dumps(
-        {"error": f"{rhost}:{rport} sent invalid command {msg['command']}"}
+        {
+            "status": "failed",
+            "error": f"{rhost}:{rport} sent invalid command {msg['command']}"}
     )
     await ws.send(response)
     await ws.close()
