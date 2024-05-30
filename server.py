@@ -66,15 +66,6 @@ async def handler(ws, db_path):
 async def main(
         host="0.0.0.0", port=8765, ssl_context=None, db_path="users.db"
 ):
-    print(f"Listening on {host}:{port}")
-    print(f"Database File: {db_path}")
-    print(f"Log File: {logging.getLogger().handlers[0].baseFilename}")
-    if ssl_context is not None:
-        print("SSL enabled")
-    else:
-        print("SSL disabled")
-    print("Press Ctrl+C to stop")
-
     bound_handler = functools.partial(handler, db_path=db_path)
 
     async with serve(
@@ -145,6 +136,15 @@ if __name__ == "__main__":
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(message)s"
         )
+
+    print(f"Listening on {args.host}:{args.port}")
+    print(f"Database File: {path_to_database}")
+    print(f"Log File: {logging.getLogger().handlers[0].baseFilename}")
+    if ssl_context is not None:
+        print("SSL enabled")
+    else:
+        print("SSL disabled")
+    print("Press Ctrl+C to stop")
 
     while True:
         try:
