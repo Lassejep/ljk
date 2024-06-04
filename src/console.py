@@ -1,6 +1,7 @@
 import pyperclip
 import traceback
 import curses
+from curses import textpad
 import sys
 import re
 import asyncio
@@ -979,6 +980,76 @@ class ServiceWindow(Window):
     pass
 
 
+class Widget:
+    def __init__(self, screen, name="Widget"):
+        screen_size = screen.getmaxyx()
+        self.box_size = (screen_size[0] // 2, screen_size[1] // 2)
+        self.box = screen.subpad(
+            self.box_size[0], self.box_size[1],
+            screen_size[0] // 4, screen_size[1] // 4
+        )
+        self.loc = self.box.getbegyx()
+        self.widget = self.box.subpad(
+            self.box_size[0] - 2, self.box_size[1] - 2,
+            self.loc[0] + 1, self.loc[1] + 1
+        )
+        self.size = self.widget.getmaxyx()
+        self.widget.keypad(True)
+        self.name = name
+        self.running = True
+        self.pos = (0, 0)
+
+    def draw(self):
+        self.box.box()
+        self.box.addstr(0, 1, self.name)
+        self.box.refresh()
+        self.widget.refresh()
+
+    def display(self):
+        self.widget.erase()
+        curses.curs_set(1)
+        while self.running:
+            self.draw()
+            text = self.get_input(secret=True)
+            self.widget.erase()
+            self.widget.addstr(3, 0, text)
+
+    def escape(self, key):
+        try:
+            if ord(key) == 27:
+                return True
+        except TypeError:
+            pass
+        return False
+
+    def validate(self, key):
+        if key == 27:
+            self.running = False
+            return 7
+        if key == 10:
+            return 7
+        return key
+
+    def input(self):
+        key = self.widget.getkey()
+        if self.escape(key):
+            self.running = False
+        return key
+
+    def get_input(self, x=0, y=0, secret=False, init_str=""):
+        location = (self.loc[0] + 1 + x, self.loc[1] + 1 + y)
+        textwin = self.widget.subpad(
+            1, self.size[1] - 2, location[0], location[1]
+        )
+        text = textpad.Textbox(textwin, insert_mode=True)
+        text.edit(self.validate)
+        return text.gather()
+
+    def message(self, message, color=None):
+        self.box.addstr(0, 1, message, color)
+        self.box.refresh()
+
+
 class MessageBox:
     def __init__(self, screen, name="Message"):
         screen_size = screen.getmaxyx()
@@ -1024,18 +1095,8 @@ class MessageBox:
 
 def run(screen, ws):
     curses.set_escdelay(10)
-    start_menu = StartMenu(screen)
-    start_menu.display()
-    test_keybinds = [
-        "1. Test", "2. Test", "3. Test", "4. Test", "5. Test", "6. Test",
-        "7. Test", "8. Test", "9. Test", "10. Test", "11. Test", "12. Test",
-    ]
-    test_options = [
-        "1. Test", "2. Test", "3. Test", "4. Test", "5. Test", "6. Test",
-        "7. Test", "8. Test", "9. Test", "10. Test", "11. Test", "12. Test",
-    ]
-    test_screen = Window(screen, keybinds=test_keybinds, options=test_options)
-    test_screen.display()
+    test_widget = Widget(screen, name="Test Widget")
+    test_widget.display()
 
 
 async def start(ws):
