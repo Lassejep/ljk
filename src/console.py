@@ -1036,6 +1036,9 @@ class Widget:
             self.running = False
         return key
 
+    # TODO: Implement secret input
+    # TODO: Implement init_str
+    # FIXME: Make textwin work properly
     def get_input(self, x=0, y=0, secret=False, init_str=""):
         location = (self.loc[0] + 1 + x, self.loc[1] + 1 + y)
         textwin = self.widget.subpad(
@@ -1044,10 +1047,6 @@ class Widget:
         text = textpad.Textbox(textwin, insert_mode=True)
         text.edit(self.validate)
         return text.gather()
-
-    def message(self, message, color=None):
-        self.box.addstr(0, 1, message, color)
-        self.box.refresh()
 
 
 class MessageBox:
