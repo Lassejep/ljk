@@ -2,7 +2,6 @@
 import ssl
 import websockets
 import asyncio
-import curses
 from src import console
 import pathlib
 
@@ -16,9 +15,7 @@ async def main():
     async with websockets.connect(
         "wss://localhost:8765", ssl=ssl_context, ping_interval=None
     ) as websocket:
-        ui = console.Console(websocket)
-        while True:
-            await ui.run()
+        await console.start(websocket)
 
 if __name__ == "__main__":
-    curses.wrapper(asyncio.run(main()))
+    asyncio.run(main())

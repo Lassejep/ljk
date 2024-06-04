@@ -1,33 +1,29 @@
 import pyperclip
+import traceback
 import curses
 import sys
 import re
+import asyncio
 from . import client
 from .encryption import generate_password
 
 
+# FIXME: Pressing ESC multiple times causes the program to show wrong windows.
+# FIXME: Program crashes when cursor moves beyond the bounds of the windows.
 class Console:
     def __init__(self, ws):
         self.ws = ws
         self.user = None
         self.vault = None
 
-        self.screen = curses.initscr()
-        self.screen_size = self.screen.getmaxyx()
-        self.menu = curses.newwin(
-            self.screen_size[0], int(self.screen_size[1] * 0.2), 0, 1
-        )
-        self.menu.keypad(True)
-        self.menu_size = self.menu.getmaxyx()
-        self.menu_loc = self.menu.getbegyx()
-        self.window = self.screen.subpad(
+        self.window = curses.newwin(
             self.screen_size[0] - 2, int(self.screen_size[1] * 0.8),
             0, int(self.screen_size[1] * 0.2)
         )
         self.window.keypad(True)
         self.window_size = self.window.getmaxyx()
         self.window_loc = self.window.getbegyx()
-        self.widget = self.screen.subpad(
+        self.widget = curses.newwin(
             int(self.window_size[0] * 0.6), int(self.window_size[1] * 0.6),
             self.window_loc[0] + int(self.window_size[0] * 0.2),
             self.window_loc[1] + int(self.window_size[1] * 0.2)
@@ -35,7 +31,7 @@ class Console:
         self.widget.keypad(True)
         self.widget_size = self.widget.getmaxyx()
         self.widget_loc = self.widget.getbegyx()
-        self.msgbox = self.screen.subpad(
+        self.msgbox = curses.newwin(
             3, self.window_size[1], self.window_size[0] - 1, self.window_loc[1]
         )
         self.msgbox.keypad(True)
@@ -78,6 +74,7 @@ class Console:
         curses.endwin()
         if error is not None:
             print(error)
+            traceback.print_exc()
         sys.exit()
 
     def message(self, message, color=None):
@@ -90,9 +87,14 @@ class Console:
 
     async def get_input(self, window, return_func, secret=False, init_str=""):
         curses.curs_set(1)
+        window_size = window.getmaxyx()
         key = window.getkey()
         string = init_str
         while self.escape(key) is False:
+            position = window.getyx()
+            if position[1] >= window_size[1] - 1:
+                window.move(position[0] + 1, 1)
+                window.insertln()
             if key == "KEY_BACKSPACE":
                 if len(string) > 0:
                     string = string[:-1]
@@ -111,14 +113,14 @@ class Console:
         curses.curs_set(0)
         return await return_func()
 
-    async def navigate(self, key, window, y_offset, length):
-        if length == 0:
-            return (-1, -1)
-        position = window.getyx()
+    async def navigate(self, key, window, y_offset, length, pos):
+        position = pos
+        self.message(f"DEBUG: Position {position}, Key {key}")
         if key == "k" or key == "KEY_UP":
             position = (position[0] - 1, position[1])
         if key == "j" or key == "KEY_DOWN":
             position = (position[0] + 1, position[1])
+            self.message(f"DEBUG: Position {position}, Key {key}")
         try:
             position = (y_offset + int(key) - 1, position[1])
         except ValueError:
@@ -126,8 +128,10 @@ class Console:
         if position[0] < y_offset:
             position = (y_offset + length - 1, position[1])
         if position[0] > y_offset + length - 1:
+            self.message("ERROR: Out of bounds", self.error_color)
             position = (y_offset, position[1])
         window.move(*position)
+        print(window.getyx())
         return position
 
     def escape(self, key):
@@ -154,52 +158,20 @@ class Console:
 
     # Menus
     async def start_menu(self):
-        y_offset = 1
-        key = f"{y_offset}"
-        while self.escape(key) is False:
-            pos = await self.navigate(key, self.menu, y_offset, 3)
-            self.redraw(self.menu)
-            self.menu.addstr(0, 1, "Menu")
-            self.menu.addstr(y_offset, 1, "1. Login")
-            self.menu.addstr(y_offset + 1, 1, "2. Register")
-            self.menu.addstr(y_offset + 2, 1, "3. Exit")
-            self.select_string(self.menu, pos[0], 1, self.menu_size[1] - 3)
-            key = self.menu.getkey()
-
-            if key == "\n":
-                if pos[0] == y_offset:
-                    await self.account_auth()
-                elif pos[0] == y_offset + 1:
-                    await self.account_register()
-                elif pos[0] == y_offset + 2:
-                    await self.exit()
+        start_options = ["1. Login", "2. Register", "3. Exit"]
+        self.start_menu = Menu(
+            self.screen, title="Start Menu", options=start_options
+        )
+        self.start_menu.display()
 
     async def main_menu(self):
-        y_offset = 1
-        key = f"{y_offset}"
-        while self.escape(key) is False:
-            pos = await self.navigate(key, self.menu, y_offset, 5)
-            self.redraw(self.menu)
-            self.menu.addstr(0, 1, "Menu")
-            self.menu.addstr(y_offset, 1, "1. Services")
-            self.menu.addstr(y_offset + 1, 1, "2. Vault")
-            self.menu.addstr(y_offset + 2, 1, "3. Settings")
-            self.menu.addstr(y_offset + 3, 1, "4. Logout")
-            self.menu.addstr(y_offset + 4, 1, "5. Exit")
-            self.select_string(self.menu, pos[0], 1, self.menu_size[1] - 3)
-            key = self.menu.getkey()
-
-            if key == "\n":
-                if pos[0] == y_offset:
-                    await self.services_window()
-                elif pos[0] == y_offset + 1:
-                    await self.vault_window()
-                elif pos[0] == y_offset + 2:
-                    await self.settings_window()
-                elif pos[0] == y_offset + 3:
-                    await self.account_logout()
-                elif pos[0] == y_offset + 4:
-                    await self.exit()
+        main_menu_options = [
+            "1. Services", "2. Vaults", "3. Settings", "4. Logout", "5. Exit"
+        ]
+        self.main_menu = Menu(
+            self.screen, title="Main Menu", options=main_menu_options
+        )
+        self.main_menu.display()
 
     # Start menu windows
     async def account_auth(self):
@@ -288,6 +260,7 @@ class Console:
         await self.main_menu()
 
     # Main menu windows
+    # TODO: Make scrolling work
     async def services_window(self, search=None):
         y_offset = 7
         y_third = self.window_size[1] // 3
@@ -483,11 +456,12 @@ class Console:
     # Vault menu functions
     async def vault_create(self):
         self.redraw(self.widget)
-        self.widget.addstr(0, 1, "Create vault")
+        win = self.widget.subpad(1, 1)
+        win.addstr(0, 1, "Create vault")
         name_field = "Vault name: "
-        self.widget.addstr(1, 1, name_field)
-        self.widget.move(1, len(name_field) + 1)
-        vault_name = await self.get_input(self.widget, self.vault_window)
+        win.addstr(1, 1, name_field)
+        win.move(1, len(name_field) + 1)
+        vault_name = await self.get_input(win, self.vault_window)
         if not await client.create_vault(
             self.ws, self.user, vault_name
         ):
@@ -767,3 +741,302 @@ class Console:
         self.vault = None
         self.redraw(self.window)
         await self.start_menu()
+
+
+class Menu:
+    def __init__(self, screen, title="Menu"):
+        screen_size = screen.getmaxyx()
+        self.box_size = (screen_size[0], screen_size[1] // 5)
+        self.box = screen.subpad(self.box_size[0], self.box_size[1], 0, 0)
+        self.menu = self.box.subpad(
+            self.box_size[0] - 2, self.box_size[1] - 2, 1, 1
+        )
+        self.size = self.menu.getmaxyx()
+        self.title = title
+        self.menu.keypad(True)
+        self.pos = (0, 0)
+        self.running = True
+
+    def escape(self, key):
+        try:
+            if ord(key) == 27:
+                return True
+        except TypeError:
+            pass
+        return False
+
+    def navigate(self):
+        key = self.menu.getkey()
+        if key == "k" or key == "KEY_UP":
+            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+        if key == "j" or key == "KEY_DOWN":
+            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+        if key == "\n":
+            self.select()
+        if self.escape(key):
+            self.running = False
+        self.draw()
+
+    def draw(self):
+        self.box.box()
+        self.box.addstr(0, 1, self.title)
+        self.box.refresh()
+        self.draw_options()
+        self.menu.refresh()
+
+    def draw_options(self):
+        for i, option in enumerate(self.options):
+            if i == self.pos[0]:
+                self.menu.addstr(i, 1, option, curses.A_REVERSE)
+            else:
+                self.menu.addstr(i, 0, option)
+
+
+class StartMenu(Menu):
+    def __init__(self, screen):
+        super().__init__(screen, title="Start Menu")
+        self.options = ["1. Login", "2. Register", "3. Exit"]
+
+    def display(self):
+        self.menu.erase()
+        curses.curs_set(0)
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.menu.erase()
+
+    def select(self):
+        if self.pos[0] == 0:
+            pass
+        if self.pos[0] == 1:
+            pass
+        if self.pos[0] == 2:
+            self.running = False
+
+
+class MainMenu(Menu):
+    def __init__(self, screen):
+        super().__init__(screen, title="Main Menu")
+        self.options = [
+            "1. Services", "2. Vaults", "3. Settings", "4. Logout", "5. Exit"
+        ]
+
+    def display(self):
+        self.menu.erase()
+        curses.curs_set(0)
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.menu.erase()
+
+    def select(self):
+        if self.pos[0] == 0:
+            pass
+        if self.pos[0] == 1:
+            pass
+        if self.pos[0] == 2:
+            pass
+        if self.pos[0] == 3:
+            pass
+        if self.pos[0] == 4:
+            self.running = False
+
+
+class Window:
+    def __init__(self, screen, name="Window", keybinds=None, options=None):
+        screen_size = screen.getmaxyx()
+        self.box_size = (screen_size[0] - 3, screen_size[1] * 4 // 5)
+        self.box = screen.subpad(
+            self.box_size[0], self.box_size[1],
+            0, screen_size[1] - self.box_size[1]
+        )
+        self.loc = self.box.getbegyx()
+        self.window = self.box.subpad(
+            self.box_size[0] - 2, self.box_size[1] - 2,
+            self.loc[0] + 1, self.loc[1] + 1
+        )
+        self.size = self.window.getmaxyx()
+        self.window.keypad(True)
+        self.name = name
+        self.keybinds = keybinds
+        self.options = options
+        self.running = True
+        self.y_offset = 0
+        self.pos = (0, 0)
+
+    def draw(self):
+        self.box.box()
+        self.box.addstr(0, 1, self.name)
+        self.box.refresh()
+        self.draw_keybinds()
+        self.draw_options()
+        self.window.refresh()
+
+    def display(self):
+        self.window.erase()
+        curses.curs_set(0)
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.window.erase()
+
+    def escape(self, key):
+        try:
+            if ord(key) == 27:
+                return True
+        except TypeError:
+            pass
+        return False
+
+    def navigate(self):
+        key = self.window.getkey()
+        if key == "k" or key == "KEY_UP":
+            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+        if key == "j" or key == "KEY_DOWN":
+            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+        if key == "\n":
+            self.running = False
+        if self.escape(key):
+            self.running = False
+
+    def draw_keybinds(self):
+        linelist, remainders = self.calculate_keybinds_height()
+        padding = self.get_keybind_padding(linelist, remainders)
+        self.y_offset = len(linelist) + 1
+        for i, line in enumerate(linelist):
+            x_offset = 0
+            for j, keybind in enumerate(line):
+                keybind = padding[i] + keybind + padding[i] + "|"
+                self.window.addstr(
+                    i, x_offset, keybind
+                )
+                x_offset += len(keybind)
+        self.window.hline(i + 1, 0, curses.ACS_HLINE, self.size[1])
+
+    def calculate_keybinds_height(self):
+        linelist = [[]]
+        y_offset = 0
+        x_offset = 0
+        remainders = []
+        for i, keybind in enumerate(self.keybinds):
+            if x_offset + len(keybind) + 3 > self.size[1]:
+                remainders.append((self.size[1]) - x_offset)
+                y_offset += 1
+                x_offset = 0
+                linelist.append([])
+            linelist[y_offset].append(keybind)
+            x_offset += len(keybind) + 3
+        remainders.append((self.size[1]) - x_offset)
+        assert len(linelist) == len(remainders)
+        return linelist, remainders
+
+    def get_keybind_padding(self, linelist, remainders):
+        padding = []
+        for i, line in enumerate(linelist):
+            pad = (remainders[i] // len(line)) // 2
+            pad = pad if pad > 0 else 1
+            padding.append(" " * pad)
+        return padding
+
+    def draw_options(self):
+        if self.options is None:
+            return
+        for i, option in enumerate(self.options):
+            if type(option) is str:
+                if i == self.pos[0]:
+                    self.window.addstr(
+                        i + self.y_offset, 1, option, curses.A_REVERSE
+                    )
+                else:
+                    self.window.addstr(i + self.y_offset, 0, option)
+            elif type(option) is tuple:
+                self.draw_cols(
+                    self.window, i + self.y_offset, 0,
+                    option, self.pos[0] == i
+                )
+
+    def draw_cols(self, window, y_offset, x_offset, option, selected):
+        length = self.size[1] // len(option)
+        for i, col in enumerate(option):
+            if selected:
+                window.addstr(y_offset, x_offset + 2, col, curses.A_REVERSE)
+                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
+            else:
+                window.addstr(y_offset, x_offset + 1, col)
+                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
+            x_offset += length
+
+
+class VaultWindow(Window):
+    pass
+
+
+class SettingsWindow(Window):
+    pass
+
+
+class ServiceWindow(Window):
+    pass
+
+
+class MessageBox:
+    def __init__(self, screen, name="Message"):
+        screen_size = screen.getmaxyx()
+        self.size = (3, screen_size[1] * 4 // 5)
+        self.box = screen.subpad(
+            self.size[0], self.size[1],
+            screen_size[0] - self.size[0], screen_size[1] - self.size[1]
+        )
+        self.loc = self.box.getbegyx()
+        self.msgbox = self.box.subpad(
+            self.size[0] - 2, self.size[1] - 2,
+            self.loc[0] + 1, self.loc[1] + 1
+        )
+        self.msgbox.keypad(True)
+        self.name = name
+        self.running = True
+
+    def draw(self):
+        self.box.erase()
+        self.box.box()
+        self.box.addstr(0, 1, self.name)
+        self.box.refresh()
+
+    def display(self):
+        while self.running:
+            self.draw()
+            self.input()
+
+    def input(self):
+        key = self.msgbox.getkey()
+        if self.escape(key):
+            self.running = False
+        return key
+
+    def info(self, message):
+        self.msgbox.addstr(0, 0, f"INFO: {message}")
+        self.msgbox.refresh()
+
+    def error(self, message):
+        self.msgbox.addstr(0, 0, f"ERROR: {message}")
+        self.msgbox.refresh()
+
+
+def run(screen, ws):
+    curses.set_escdelay(10)
+    start_menu = StartMenu(screen)
+    start_menu.display()
+    test_keybinds = [
+        "1. Test", "2. Test", "3. Test", "4. Test", "5. Test", "6. Test",
+        "7. Test", "8. Test", "9. Test", "10. Test", "11. Test", "12. Test",
+    ]
+    test_options = [
+        "1. Test", "2. Test", "3. Test", "4. Test", "5. Test", "6. Test",
+        "7. Test", "8. Test", "9. Test", "10. Test", "11. Test", "12. Test",
+    ]
+    test_screen = Window(screen, keybinds=test_keybinds, options=test_options)
+    test_screen.display()
+
+
+async def start(ws):
+    curses.wrapper(run, ws)
