@@ -11,7 +11,7 @@ from .encryption import generate_password
 
 # FIXME: Pressing ESC multiple times causes the program to show wrong windows.
 # FIXME: Program crashes when cursor moves beyond the bounds of the windows.
-class Console:
+class App:
     def __init__(self, ws):
         self.ws = ws
         self.user = None
@@ -744,19 +744,23 @@ class Console:
         await self.start_menu()
 
 
-class Menu:
-    def __init__(self, screen, title="Menu"):
-        screen_size = screen.getmaxyx()
-        self.box_size = (screen_size[0], screen_size[1] // 5)
-        self.box = screen.subpad(self.box_size[0], self.box_size[1], 0, 0)
-        self.menu = self.box.subpad(
-            self.box_size[0] - 2, self.box_size[1] - 2, 1, 1
-        )
-        self.size = self.menu.getmaxyx()
+class Console:
+    def __init__(self, screen, title):
+        self.screen_size = screen.getmaxyx()
         self.title = title
-        self.menu.keypad(True)
         self.pos = (0, 0)
         self.running = True
+        curses.curs_set(0)
+        curses.start_color()
+        curses.use_default_colors()
+        for i in range(0, curses.COLORS):
+            curses.init_pair(i + 1, i, -1)
+        self.text_color = curses.color_pair(0)
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_WHITE)
+        self.background_color = curses.color_pair(1)
+        self.hl_color = curses.color_pair(2)
+        self.error_color = curses.color_pair(4)
+        self.msgbox = MessageBox(screen, error_color=self.error_color)
 
     def escape(self, key):
         try:
@@ -778,19 +782,61 @@ class Menu:
             self.running = False
         self.draw()
 
-    def draw(self):
+    def draw_box(self):
         self.box.box()
         self.box.addstr(0, 1, self.title)
         self.box.refresh()
-        self.draw_options()
-        self.menu.refresh()
 
     def draw_options(self):
+        if self.options is None:
+            return
         for i, option in enumerate(self.options):
-            if i == self.pos[0]:
-                self.menu.addstr(i, 1, option, curses.A_REVERSE)
+            if type(option) is str:
+                if i == self.pos[0]:
+                    self.window.addstr(
+                        i + self.y_offset, 1, option, curses.A_REVERSE
+                    )
+                else:
+                    self.window.addstr(i + self.y_offset, 0, option)
+            elif type(option) is tuple:
+                self.draw_cols(
+                    self.window, i + self.y_offset, 0,
+                    option, self.pos[0] == i
+                )
+
+    def draw_cols(self, window, y_offset, x_offset, option, selected):
+        length = self.size[1] // len(option)
+        for i, col in enumerate(option):
+            if selected:
+                window.addstr(y_offset, x_offset + 2, col, curses.A_REVERSE)
+                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
             else:
-                self.menu.addstr(i, 0, option)
+                window.addstr(y_offset, x_offset + 1, col)
+                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
+            x_offset += length
+
+    def center(self, size, text):
+        return (size[1] - len(text)) // 2
+
+
+class Menu(Console):
+    def __init__(self, screen, title="Menu"):
+        super().__init__(screen, title)
+        self.box_size = (self.screen_size[0], self.screen_size[1] // 5)
+        self.box = screen.subpad(self.box_size[0], self.box_size[1], 0, 0)
+        self.loc = self.box.getbegyx()
+        self.menu = self.box.subpad(
+            self.box_size[0] - 2, self.box_size[1] - 2,
+            self.loc[0] + 1, self.loc[1] + 1
+        )
+        self.size = self.menu.getmaxyx()
+        self.loc = self.menu.getbegyx()
+        self.menu.keypad(True)
+
+    def draw(self):
+        self.draw_box()
+        self.draw_options()
+        self.menu.refresh()
 
 
 class StartMenu(Menu):
@@ -798,9 +844,9 @@ class StartMenu(Menu):
         super().__init__(screen, title="Start Menu")
         self.options = ["1. Login", "2. Register", "3. Exit"]
 
-    def display(self):
+    def run(self):
+        self.running = True
         self.menu.erase()
-        curses.curs_set(0)
         while self.running:
             self.draw()
             self.navigate()
@@ -843,13 +889,15 @@ class MainMenu(Menu):
             self.running = False
 
 
-class Window:
+class Window(Console):
     def __init__(self, screen, name="Window", keybinds=None, options=None):
-        screen_size = screen.getmaxyx()
-        self.box_size = (screen_size[0] - 3, screen_size[1] * 4 // 5)
+        super().__init__(screen, name)
+        self.box_size = (
+            self.screen_size[0] - 3, self.screen_size[1] * 4 // 5
+        )
         self.box = screen.subpad(
             self.box_size[0], self.box_size[1],
-            0, screen_size[1] - self.box_size[1]
+            0, self.screen_size[1] - self.box_size[1]
         )
         self.loc = self.box.getbegyx()
         self.window = self.box.subpad(
@@ -857,18 +905,14 @@ class Window:
             self.loc[0] + 1, self.loc[1] + 1
         )
         self.size = self.window.getmaxyx()
+        self.loc = self.window.getbegyx()
         self.window.keypad(True)
-        self.name = name
         self.keybinds = keybinds
         self.options = options
-        self.running = True
         self.y_offset = 0
-        self.pos = (0, 0)
 
     def draw(self):
-        self.box.box()
-        self.box.addstr(0, 1, self.name)
-        self.box.refresh()
+        self.draw_box()
         self.draw_keybinds()
         self.draw_options()
         self.window.refresh()
@@ -880,25 +924,6 @@ class Window:
             self.draw()
             self.navigate()
             self.window.erase()
-
-    def escape(self, key):
-        try:
-            if ord(key) == 27:
-                return True
-        except TypeError:
-            pass
-        return False
-
-    def navigate(self):
-        key = self.window.getkey()
-        if key == "k" or key == "KEY_UP":
-            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
-        if key == "j" or key == "KEY_DOWN":
-            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
-        if key == "\n":
-            self.running = False
-        if self.escape(key):
-            self.running = False
 
     def draw_keybinds(self):
         linelist, remainders = self.calculate_keybinds_height()
@@ -939,34 +964,6 @@ class Window:
             padding.append(" " * pad)
         return padding
 
-    def draw_options(self):
-        if self.options is None:
-            return
-        for i, option in enumerate(self.options):
-            if type(option) is str:
-                if i == self.pos[0]:
-                    self.window.addstr(
-                        i + self.y_offset, 1, option, curses.A_REVERSE
-                    )
-                else:
-                    self.window.addstr(i + self.y_offset, 0, option)
-            elif type(option) is tuple:
-                self.draw_cols(
-                    self.window, i + self.y_offset, 0,
-                    option, self.pos[0] == i
-                )
-
-    def draw_cols(self, window, y_offset, x_offset, option, selected):
-        length = self.size[1] // len(option)
-        for i, col in enumerate(option):
-            if selected:
-                window.addstr(y_offset, x_offset + 2, col, curses.A_REVERSE)
-                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
-            else:
-                window.addstr(y_offset, x_offset + 1, col)
-                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
-            x_offset += length
-
 
 class VaultWindow(Window):
     pass
@@ -980,47 +977,36 @@ class ServiceWindow(Window):
     pass
 
 
-class Widget:
+class Widget(Console):
     def __init__(self, screen, name="Widget"):
-        screen_size = screen.getmaxyx()
-        self.box_size = (screen_size[0] // 2, screen_size[1] // 2)
+        super().__init__(screen, name)
+        self.box_size = (self.screen_size[0] // 2, self.screen_size[1] // 2)
         self.box = screen.subpad(
             self.box_size[0], self.box_size[1],
-            screen_size[0] // 4, screen_size[1] // 4
+            self.screen_size[0] // 4, self.screen_size[1] // 4
         )
-        self.loc = self.box.getbegyx()
+        loc = self.box.getbegyx()
         self.widget = self.box.subpad(
             self.box_size[0] - 2, self.box_size[1] - 2,
-            self.loc[0] + 1, self.loc[1] + 1
+            loc[0] + 1, loc[1] + 1
         )
         self.size = self.widget.getmaxyx()
+        self.loc = self.widget.getbegyx()
         self.widget.keypad(True)
-        self.name = name
-        self.running = True
-        self.pos = (0, 0)
 
     def draw(self):
         self.box.box()
-        self.box.addstr(0, 1, self.name)
+        self.box.addstr(0, 1, self.title)
         self.box.refresh()
         self.widget.refresh()
 
     def display(self):
         self.widget.erase()
-        curses.curs_set(1)
         while self.running:
             self.draw()
-            text = self.get_input(secret=True)
+            text = self.get_input((0, 0), secret=True)
             self.widget.erase()
             self.widget.addstr(3, 0, text)
-
-    def escape(self, key):
-        try:
-            if ord(key) == 27:
-                return True
-        except TypeError:
-            pass
-        return False
 
     def validate(self, key):
         if key == 27:
@@ -1030,27 +1016,25 @@ class Widget:
             return 7
         return key
 
-    def input(self):
-        key = self.widget.getkey()
-        if self.escape(key):
-            self.running = False
-        return key
-
-    # TODO: Implement secret input
-    # TODO: Implement init_str
-    # FIXME: Make textwin work properly
-    def get_input(self, x=0, y=0, secret=False, init_str=""):
-        location = (self.loc[0] + 1 + x, self.loc[1] + 1 + y)
+    def get_input(self, pos, height=1, init_str="", secret=False):
+        curses.curs_set(1)
         textwin = self.widget.subpad(
-            1, self.size[1] - 2, location[0], location[1]
+            height, self.size[1] - pos[1],
+            self.loc[0] + pos[0], self.loc[1] + pos[1]
         )
+        if secret:
+            textwin.attron(self.background_color)
         text = textpad.Textbox(textwin, insert_mode=True)
+        textwin.addstr(0, 0, init_str)
         text.edit(self.validate)
+        curses.curs_set(0)
+        if secret:
+            textwin.attroff(self.background_color)
         return text.gather()
 
 
 class MessageBox:
-    def __init__(self, screen, name="Message"):
+    def __init__(self, screen, name="Messages", error_color=None):
         screen_size = screen.getmaxyx()
         self.size = (3, screen_size[1] * 4 // 5)
         self.box = screen.subpad(
@@ -1063,32 +1047,27 @@ class MessageBox:
             self.loc[0] + 1, self.loc[1] + 1
         )
         self.msgbox.keypad(True)
-        self.name = name
-        self.running = True
+        self.title = name
+        self.error_color = error_color
 
-    def draw(self):
+    def draw_box(self):
         self.box.erase()
         self.box.box()
-        self.box.addstr(0, 1, self.name)
+        self.box.addstr(0, 1, self.title)
         self.box.refresh()
 
-    def display(self):
-        while self.running:
-            self.draw()
-            self.input()
-
-    def input(self):
-        key = self.msgbox.getkey()
-        if self.escape(key):
-            self.running = False
-        return key
-
     def info(self, message):
+        self.msgbox.erase()
         self.msgbox.addstr(0, 0, f"INFO: {message}")
         self.msgbox.refresh()
 
     def error(self, message):
-        self.msgbox.addstr(0, 0, f"ERROR: {message}")
+        self.msgbox.erase()
+        self.msgbox.addstr(0, 0, f"ERROR: {message}", self.error_color)
+        self.msgbox.refresh()
+
+    def clear(self):
+        self.msgbox.erase()
         self.msgbox.refresh()
 
 
