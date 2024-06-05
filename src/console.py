@@ -749,7 +749,7 @@ class Console:
         self.screen_size = screen.getmaxyx()
         self.title = title
         self.pos = (0, 0)
-        self.running = True
+        self.running = False
         curses.curs_set(0)
         curses.start_color()
         curses.use_default_colors()
@@ -819,6 +819,44 @@ class Console:
         return (size[1] - len(text)) // 2
 
 
+class MessageBox:
+    def __init__(self, screen, name="Messages", error_color=None):
+        screen_size = screen.getmaxyx()
+        self.size = (3, screen_size[1] * 4 // 5)
+        self.box = screen.subpad(
+            self.size[0], self.size[1],
+            screen_size[0] - self.size[0], screen_size[1] - self.size[1]
+        )
+        self.loc = self.box.getbegyx()
+        self.msgbox = self.box.subpad(
+            self.size[0] - 2, self.size[1] - 2,
+            self.loc[0] + 1, self.loc[1] + 1
+        )
+        self.msgbox.keypad(True)
+        self.title = name
+        self.error_color = error_color
+
+    def draw_box(self):
+        self.box.erase()
+        self.box.box()
+        self.box.addstr(0, 1, self.title)
+        self.box.refresh()
+
+    def info(self, message):
+        self.msgbox.erase()
+        self.msgbox.addstr(0, 0, f"INFO: {message}")
+        self.msgbox.refresh()
+
+    def error(self, message):
+        self.msgbox.erase()
+        self.msgbox.addstr(0, 0, f"ERROR: {message}", self.error_color)
+        self.msgbox.refresh()
+
+    def clear(self):
+        self.msgbox.erase()
+        self.msgbox.refresh()
+
+
 class Menu(Console):
     def __init__(self, screen, title="Menu"):
         super().__init__(screen, title)
@@ -868,7 +906,8 @@ class MainMenu(Menu):
             "1. Services", "2. Vaults", "3. Settings", "4. Logout", "5. Exit"
         ]
 
-    def display(self):
+    def run(self):
+        self.running = True
         self.menu.erase()
         curses.curs_set(0)
         while self.running:
@@ -917,15 +956,9 @@ class Window(Console):
         self.draw_options()
         self.window.refresh()
 
-    def display(self):
-        self.window.erase()
-        curses.curs_set(0)
-        while self.running:
-            self.draw()
-            self.navigate()
-            self.window.erase()
-
     def draw_keybinds(self):
+        if self.keybinds is None:
+            return
         linelist, remainders = self.calculate_keybinds_height()
         padding = self.get_keybind_padding(linelist, remainders)
         self.y_offset = len(linelist) + 1
@@ -966,15 +999,131 @@ class Window(Console):
 
 
 class VaultWindow(Window):
-    pass
+    def __init__(self, screen):
+        super().__init__(screen, name="Vaults")
+        self.keybinds = [
+            "<Enter> Select vault", "<A> Add vault",
+            "<D> Delete vault", "<R> Rename vault", "<ESC> Main menu"
+        ]
+
+    def run(self):
+        self.running = True
+        self.window.erase()
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.window.erase()
+
+    def select(self):
+        if self.pos[0] == 0:
+            pass
+        if self.pos[0] == 1:
+            pass
+        if self.pos[0] == 2:
+            pass
+        if self.pos[0] == 3:
+            pass
+        if self.pos[0] == 4:
+            self.running = False
 
 
 class SettingsWindow(Window):
-    pass
+    def __init__(self, screen):
+        super().__init__(screen, name="Settings")
+        self.options = [
+            "1. Change master password", "2. Change email",
+            "3. Delete account"
+        ]
+
+    def run(self):
+        self.running = True
+        self.window.erase()
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.window.erase()
+
+    def select(self):
+        if self.pos[0] == 0:
+            pass
+        if self.pos[0] == 1:
+            pass
+        if self.pos[0] == 2:
+            pass
 
 
 class ServiceWindow(Window):
-    pass
+    def __init__(self, screen):
+        super().__init__(screen, name="Services")
+        self.keybinds = [
+            "<Y> Copy password", "<Enter> Show service",
+            "<A> Add service", "<D> Delete service",
+            "<E> Edit service", "<ESC> Main menu"
+        ]
+
+    def run(self):
+        self.running = True
+        self.window.erase()
+        while self.running:
+            self.draw()
+            self.navigate()
+            self.window.erase()
+
+    def select(self):
+        if self.pos[0] == 0:
+            pass
+        if self.pos[0] == 1:
+            pass
+        if self.pos[0] == 2:
+            pass
+        if self.pos[0] == 3:
+            pass
+        if self.pos[0] == 4:
+            pass
+        if self.pos[0] == 5:
+            self.running = False
+
+
+class InputForm:
+    def __init__(
+        self, widget, prompt, pos, init_str="", secret=False, height=1
+    ):
+        self.widget = widget
+        self.widget_size = widget.getmaxyx()
+        self.prompt = prompt
+        self.init_str = init_str
+        self.height = height
+        self.secret = secret
+        self.pos = pos
+        loc = self.widget.getbegyx()
+        self.input_field = self.widget.subpad(
+            self.height, self.widget_size[1] - len(self.prompt),
+            loc[0] + self.pos[0], loc[1] + self.pos[1] + len(self.prompt)
+        )
+        self.textbox = textpad.Textbox(self.input_field, insert_mode=True)
+        self.background_color = curses.color_pair(1)
+
+    def draw(self):
+        self.widget.addstr(self.pos[0], self.pos[1], self.prompt)
+        if self.secret:
+            self.input_field.attron(self.background_color)
+        self.input_field.addstr(0, 0, self.init_str)
+        self.input_field.refresh()
+
+    def validate(self, key):
+        if key == 27:
+            self.running = False
+            return 7
+        if key == 10:
+            return 7
+        return key
+
+    def get_input(self):
+        self.input_field.move(0, len(self.init_str))
+        curses.curs_set(1)
+        out = self.textbox.edit(self.validate)
+        curses.curs_set(0)
+        return out
 
 
 class Widget(Console):
@@ -993,88 +1142,42 @@ class Widget(Console):
         self.size = self.widget.getmaxyx()
         self.loc = self.widget.getbegyx()
         self.widget.keypad(True)
+        self.text_fields = None
 
     def draw(self):
-        self.box.box()
-        self.box.addstr(0, 1, self.title)
-        self.box.refresh()
+        self.draw_box()
+        if self.text_fields is not None:
+            for text_field in self.text_fields:
+                text_field.draw()
         self.widget.refresh()
 
-    def display(self):
+
+class LoginWidget(Widget):
+    def __init__(self, screen):
+        super().__init__(screen, name="Login")
+        self.email_form = InputForm(self.widget, "Email: ", (0, 0))
+        self.mkey_form = InputForm(
+            self.widget, "Master password: ", (1, 0), secret=True
+        )
+        self.text_fields = [self.email_form, self.mkey_form]
+
+    def run(self):
+        self.running = True
         self.widget.erase()
         while self.running:
             self.draw()
-            text = self.get_input((0, 0), secret=True)
+            for text_field in self.text_fields:
+                text_field.get_input()
             self.widget.erase()
-            self.widget.addstr(3, 0, text)
 
-    def validate(self, key):
-        if key == 27:
-            self.running = False
-            return 7
-        if key == 10:
-            return 7
-        return key
-
-    def get_input(self, pos, height=1, init_str="", secret=False):
-        curses.curs_set(1)
-        textwin = self.widget.subpad(
-            height, self.size[1] - pos[1],
-            self.loc[0] + pos[0], self.loc[1] + pos[1]
-        )
-        if secret:
-            textwin.attron(self.background_color)
-        text = textpad.Textbox(textwin, insert_mode=True)
-        textwin.addstr(0, 0, init_str)
-        text.edit(self.validate)
-        curses.curs_set(0)
-        if secret:
-            textwin.attroff(self.background_color)
-        return text.gather()
-
-
-class MessageBox:
-    def __init__(self, screen, name="Messages", error_color=None):
-        screen_size = screen.getmaxyx()
-        self.size = (3, screen_size[1] * 4 // 5)
-        self.box = screen.subpad(
-            self.size[0], self.size[1],
-            screen_size[0] - self.size[0], screen_size[1] - self.size[1]
-        )
-        self.loc = self.box.getbegyx()
-        self.msgbox = self.box.subpad(
-            self.size[0] - 2, self.size[1] - 2,
-            self.loc[0] + 1, self.loc[1] + 1
-        )
-        self.msgbox.keypad(True)
-        self.title = name
-        self.error_color = error_color
-
-    def draw_box(self):
-        self.box.erase()
-        self.box.box()
-        self.box.addstr(0, 1, self.title)
-        self.box.refresh()
-
-    def info(self, message):
-        self.msgbox.erase()
-        self.msgbox.addstr(0, 0, f"INFO: {message}")
-        self.msgbox.refresh()
-
-    def error(self, message):
-        self.msgbox.erase()
-        self.msgbox.addstr(0, 0, f"ERROR: {message}", self.error_color)
-        self.msgbox.refresh()
-
-    def clear(self):
-        self.msgbox.erase()
-        self.msgbox.refresh()
+    def select(self):
+        pass
 
 
 def run(screen, ws):
     curses.set_escdelay(10)
-    test_widget = Widget(screen, name="Test Widget")
-    test_widget.display()
+    login = LoginWidget(screen)
+    login.run()
 
 
 async def start(ws):
