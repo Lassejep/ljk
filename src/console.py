@@ -399,7 +399,7 @@ class ServiceWindow(Window):
         self.keybinds = [
             "<Y> Copy password", "<Enter> Show service",
             "<A> Add service", "<D> Delete service",
-            "<E> Edit service", "<ESC> Main menu"
+            "<E> Edit service", "</> Search", "<ESC> Main menu"
         ]
         self.service_list = None
 
@@ -415,12 +415,6 @@ class ServiceWindow(Window):
 
     async def navigate(self):
         key = self.window.getkey()
-        if key == "k" or key == "KEY_UP":
-            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
-        if key == "j" or key == "KEY_DOWN":
-            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
-        if key == "\n":
-            self.console.show_service.run(self.service_list[self.pos[0]])
         if self.console.escape(key):
             self.running = False
         if key.lower() == "a":
@@ -429,20 +423,27 @@ class ServiceWindow(Window):
             await client.save_vault(
                 self.console.ws, self.console.user, self.console.vault
             )
-        if key.lower() == "d":
-            self.delete_service()
-            self.update_service_list()
-            await client.save_vault(
-                self.console.ws, self.console.user, self.console.vault
-            )
-        if key.lower() == "e":
-            self.console.edit_service.run(self.service_list[self.pos[0]])
-            self.update_service_list()
-            await client.save_vault(
-                self.console.ws, self.console.user, self.console.vault
-            )
-        if key.lower() == "y":
-            self.copy_password()
+        if self.options is not None:
+            if key == "k" or key == "KEY_UP":
+                self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+            if key == "j" or key == "KEY_DOWN":
+                self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+            if key == "\n":
+                self.console.show_service.run(self.service_list[self.pos[0]])
+            if key.lower() == "d":
+                self.delete_service()
+                self.update_service_list()
+                await client.save_vault(
+                    self.console.ws, self.console.user, self.console.vault
+                )
+            if key.lower() == "e":
+                self.console.edit_service.run(self.service_list[self.pos[0]])
+                self.update_service_list()
+                await client.save_vault(
+                    self.console.ws, self.console.user, self.console.vault
+                )
+            if key.lower() == "y":
+                self.copy_password()
         self.draw()
 
     def update_service_list(self):
@@ -498,29 +499,33 @@ class VaultWindow(Window):
 
     async def navigate(self):
         key = self.window.getkey()
-        if key == "k" or key == "KEY_UP":
-            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
-        if key == "j" or key == "KEY_DOWN":
-            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
-        if key == "\n":
-            await self.select()
         if self.console.escape(key):
             self.running = False
         if key.lower() == "a":
             await self.console.add_vault.run()
             await self.update_vault_list()
-        if key.lower() == "d":
-            await self.delete_vault()
-        if key.lower() == "r":
-            await self.console.rename_vault.run(self.options[self.pos[0]])
-            await self.update_vault_list()
+        if self.options is not None:
+            if key == "k" or key == "KEY_UP":
+                self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+            if key == "j" or key == "KEY_DOWN":
+                self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+            if key == "\n":
+                await self.select()
+            if key.lower() == "d":
+                await self.delete_vault()
+            if key.lower() == "r":
+                await self.console.rename_vault.run(self.options[self.pos[0]])
+                await self.update_vault_list()
         self.draw()
 
     async def update_vault_list(self):
         self.vault_list = await client.get_vaults(
             self.console.ws, self.console.user
         )
-        self.options = [vault["name"] for vault in self.vault_list]
+        if self.vault_list is None:
+            self.options = None
+        else:
+            self.options = [vault["name"] for vault in self.vault_list]
         self.draw()
 
     async def select(self):
@@ -581,20 +586,20 @@ class SettingsWindow(Window):
             await self.console.delete_account.run()
 
 
-# TODO: Make escape key close the widget
 class InputForm:
     def __init__(
         self, widget, prompt, pos, init_str="", secret=False, height=1
     ):
         self.widget = widget
-        self.widget_size = widget.getmaxyx()
+        self.widget_window = widget.widget
+        self.widget_size = self.widget_window.getmaxyx()
         self.prompt = prompt
         self.init_str = init_str
         self.height = height
         self.secret = secret
         self.pos = pos
-        loc = self.widget.getbegyx()
-        self.input_field = self.widget.subpad(
+        loc = self.widget_window.getbegyx()
+        self.input_field = self.widget_window.subpad(
             self.height, self.widget_size[1] - len(self.prompt),
             loc[0] + self.pos[0], loc[1] + self.pos[1] + len(self.prompt)
         )
@@ -602,7 +607,7 @@ class InputForm:
         self.background_color = curses.color_pair(1)
 
     def draw(self):
-        self.widget.addstr(self.pos[0], self.pos[1], self.prompt)
+        self.widget_window.addstr(self.pos[0], self.pos[1], self.prompt)
         if self.secret:
             self.input_field.attron(self.background_color)
         self.input_field.addstr(0, 0, self.init_str)
@@ -611,6 +616,8 @@ class InputForm:
     def validate(self, key):
         if key == 27:
             self.running = False
+            self.widget.running = False
+            self.widget.clear()
             return 7
         if key == 10:
             return 7
@@ -624,7 +631,9 @@ class InputForm:
         curses.curs_set(1)
         out = self.textbox.edit(self.validate)
         curses.curs_set(0)
-        return out
+        if not self.widget.running:
+            return None
+        return out.strip()
 
 
 class Widget:
@@ -675,9 +684,9 @@ class LoginWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Login")
         self.console = console
-        self.email_form = InputForm(self.widget, "Email: ", (0, 0))
+        self.email_form = InputForm(self, "Email: ", (0, 0))
         self.mpass_form = InputForm(
-            self.widget, "Master password: ", (1, 0), secret=True
+            self, "Master password: ", (1, 0), secret=True
         )
         self.text_fields = [self.email_form, self.mpass_form]
 
@@ -685,11 +694,17 @@ class LoginWidget(Widget):
         self.running = True
         self.draw()
         email = self.email_form.get_input()
+        if email is None:
+            self.clear()
+            return None
         if len(email) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return None
         mpass = self.mpass_form.get_input()
+        if mpass is None:
+            self.clear()
+            return None
         if len(mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
@@ -707,12 +722,12 @@ class LoginWidget(Widget):
 class RegisterWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Register")
-        self.email_form = InputForm(self.widget, "Email: ", (0, 0))
+        self.email_form = InputForm(self, "Email: ", (0, 0))
         self.mpass_form = InputForm(
-            self.widget, "Master password: ", (1, 0), secret=True
+            self, "Master password: ", (1, 0), secret=True
         )
         self.repeat_mpass_form = InputForm(
-            self.widget, "Repeat master password: ", (2, 0), secret=True
+            self, "Repeat master password: ", (2, 0), secret=True
         )
         self.text_fields = [
             self.email_form, self.mpass_form, self.repeat_mpass_form
@@ -722,16 +737,25 @@ class RegisterWidget(Widget):
         self.running = True
         self.draw()
         email = self.email_form.get_input()
+        if email is None:
+            self.clear()
+            return
         if len(email) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
         mpass = self.mpass_form.get_input()
+        if mpass is None:
+            self.clear()
+            return
         if len(mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
         repeat_mpass = self.repeat_mpass_form.get_input()
+        if repeat_mpass is None:
+            self.clear()
+            return
         if mpass != repeat_mpass:
             self.console.msgbox.error("Passwords do not match")
             self.clear()
@@ -748,7 +772,7 @@ class DeleteAccountWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Delete account")
         self.mpass_form = InputForm(
-            self.widget, "Master password: ", (0, 0), secret=True
+            self, "Master password: ", (0, 0), secret=True
         )
         self.text_fields = [self.mpass_form]
 
@@ -756,6 +780,9 @@ class DeleteAccountWidget(Widget):
         self.running = True
         self.draw()
         mpass = self.mpass_form.get_input()
+        if mpass is None:
+            self.clear()
+            return
         if len(mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
@@ -781,9 +808,9 @@ class DeleteAccountWidget(Widget):
 class ChangeEmailWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Change email")
-        self.email_form = InputForm(self.widget, "New Email: ", (0, 0))
+        self.email_form = InputForm(self, "New Email: ", (0, 0))
         self.mpass_form = InputForm(
-            self.widget, "Master password: ", (1, 0), secret=True
+            self, "Master password: ", (1, 0), secret=True
         )
         self.text_fields = [self.email_form, self.mpass_form]
 
@@ -791,11 +818,17 @@ class ChangeEmailWidget(Widget):
         self.running = True
         self.draw()
         new_email = self.email_form.get_input()
+        if new_email is None:
+            self.clear()
+            return
         if len(new_email) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
         mpass = self.mpass_form.get_input()
+        if mpass is None:
+            self.clear()
+            return
         if len(mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
@@ -817,13 +850,13 @@ class ChangeMpassWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Change master password")
         self.old_mpass_form = InputForm(
-            self.widget, "Old master password: ", (0, 0), secret=True
+            self, "Old master password: ", (0, 0), secret=True
         )
         self.new_mpass_form = InputForm(
-            self.widget, "New master password: ", (1, 0), secret=True
+            self, "New master password: ", (1, 0), secret=True
         )
         self.repeat_new_mpass_form = InputForm(
-            self.widget, "Repeat new master password:",
+            self, "Repeat new master password:",
             (2, 0), secret=True
         )
         self.text_fields = [
@@ -835,16 +868,25 @@ class ChangeMpassWidget(Widget):
         self.running = True
         self.draw()
         old_mpass = self.old_mpass_form.get_input()
+        if old_mpass is None:
+            self.clear()
+            return
         if len(old_mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
         new_mpass = self.new_mpass_form.get_input()
+        if new_mpass is None:
+            self.clear()
+            return
         if len(new_mpass) < 8:
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
         repeat_new_mpass = self.repeat_new_mpass_form.get_input()
+        if repeat_new_mpass is None:
+            self.clear()
+            return
         if new_mpass != repeat_new_mpass:
             self.console.msgbox.error("Passwords do not match")
             self.clear()
@@ -865,13 +907,16 @@ class ChangeMpassWidget(Widget):
 class AddVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Add vault")
-        self.vault_name_form = InputForm(self.widget, "Vault name: ", (0, 0))
+        self.vault_name_form = InputForm(self, "Vault name: ", (0, 0))
         self.text_fields = [self.vault_name_form]
 
     async def run(self):
         self.running = True
         self.draw()
         vault_name = self.vault_name_form.get_input()
+        if vault_name is None:
+            self.clear()
+            return
         if vault_name == "":
             self.clear()
             return
@@ -889,13 +934,16 @@ class RenameVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Rename vault")
         self.vault_name_form = InputForm(
-            self.widget, "New vault name: ", (0, 0))
+            self, "New vault name: ", (0, 0))
         self.text_fields = [self.vault_name_form]
 
     async def run(self, vault_name):
         self.running = True
         self.draw()
         new_vault_name = self.vault_name_form.get_input()
+        if new_vault_name is None:
+            self.clear()
+            return
         if new_vault_name == "":
             self.clear()
             return
@@ -912,10 +960,10 @@ class RenameVaultWidget(Widget):
 class AddServiceWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Add service")
-        self.service_form = InputForm(self.widget, "Service: ", (0, 0))
-        self.username_form = InputForm(self.widget, "Username: ", (1, 0))
-        self.password_form = InputForm(self.widget, "Password: ", (2, 0))
-        self.notes_form = InputForm(self.widget, "Notes: ", (3, 0))
+        self.service_form = InputForm(self, "Service: ", (0, 0))
+        self.username_form = InputForm(self, "Username: ", (1, 0))
+        self.password_form = InputForm(self, "Password: ", (2, 0))
+        self.notes_form = InputForm(self, "Notes: ", (3, 0))
         self.text_fields = [
             self.service_form, self.username_form,
             self.password_form, self.notes_form
@@ -925,14 +973,26 @@ class AddServiceWidget(Widget):
         self.running = True
         self.password_form.init_str = generate_password()
         self.draw()
-        service_name = self.service_form.get_input().strip()
+        service_name = self.service_form.get_input()
+        if service_name is None:
+            self.clear()
+            return
         if service_name == "":
             self.console.msgbox.error("Service name cannot be empty")
             self.clear()
             return
-        username = self.username_form.get_input().strip()
-        password = self.password_form.get_input().strip()
-        notes = self.notes_form.get_input().strip()
+        username = self.username_form.get_input()
+        if username is None:
+            self.clear()
+            return
+        password = self.password_form.get_input()
+        if password is None:
+            self.clear()
+            return
+        notes = self.notes_form.get_input()
+        if notes is None:
+            self.clear()
+            return
         self.console.vault.add(
             service=service_name, user=username, password=password, notes=notes
         )
@@ -946,16 +1006,16 @@ class EditServiceWidget(Widget):
 
     def run(self, service):
         self.service_form = InputForm(
-            self.widget, "Service: ", (0, 0), init_str=service["service"]
+            self, "Service: ", (0, 0), init_str=service["service"]
         )
         self.username_form = InputForm(
-            self.widget, "Username: ", (1, 0), init_str=service["user"]
+            self, "Username: ", (1, 0), init_str=service["user"]
         )
         self.password_form = InputForm(
-            self.widget, "Password: ", (2, 0), init_str=service["password"],
+            self, "Password: ", (2, 0), init_str=service["password"],
         )
         self.notes_form = InputForm(
-            self.widget, "Notes: ", (3, 0), init_str=service["notes"]
+            self, "Notes: ", (3, 0), init_str=service["notes"]
         )
         self.text_fields = [
             self.service_form, self.username_form,
@@ -963,14 +1023,26 @@ class EditServiceWidget(Widget):
         ]
         self.running = True
         self.draw()
-        service_name = self.service_form.get_input().strip()
+        service_name = self.service_form.get_input()
+        if service_name is None:
+            self.clear()
+            return
         if service_name == "":
             self.console.msgbox.error("Service name cannot be empty")
             self.clear()
             return
-        username = self.username_form.get_input().strip()
-        password = self.password_form.get_input().strip()
-        notes = self.notes_form.get_input().strip()
+        username = self.username_form.get_input()
+        if username is None:
+            self.clear()
+            return
+        password = self.password_form.get_input()
+        if password is None:
+            self.clear()
+            return
+        notes = self.notes_form.get_input()
+        if notes is None:
+            self.clear()
+            return
         self.console.vault.update(
             service["id"], service_name, username, password, notes
         )
