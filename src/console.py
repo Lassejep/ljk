@@ -41,6 +41,9 @@ class Console:
         self.add_vault = AddVaultWidget(self)
         self.rename_vault = RenameVaultWidget(self)
         self.services_window = ServiceWindow(self)
+        self.show_service = ShowServiceWidget(self)
+        self.add_service = AddServiceWidget(self)
+        self.edit_service = EditServiceWidget(self)
 
     async def run(self):
         self.running = True
@@ -51,6 +54,8 @@ class Console:
             else:
                 self.start_menu.menu.erase()
                 await self.main_menu.run()
+        if self.vault is not None:
+            await client.save_vault(self.ws, self.user, self.vault)
 
     def escape(self, key):
         try:
@@ -161,6 +166,7 @@ class Menu:
         self.pos = (0, 0)
 
     def draw(self):
+        self.menu.erase()
         self.draw_box()
         self.draw_options()
         self.menu.refresh()
@@ -236,12 +242,22 @@ class MainMenu(Menu):
     async def select(self):
         self.running = False
         if self.pos[0] == 0:
-            await self.console.services_window.run()
+            if self.console.vault is None:
+                self.console.msgbox.error("No vault selected")
+                self.pos = (1, 0)
+                self.draw()
+                await self.console.vault_window.run()
+            else:
+                await self.console.services_window.run()
         if self.pos[0] == 1:
             await self.console.vault_window.run()
         if self.pos[0] == 2:
             await self.console.settings_window.run()
         if self.pos[0] == 3:
+            if self.console.vault is not None:
+                await client.save_vault(
+                    self.console.ws, self.console.user, self.console.vault
+                )
             self.console.user = None
             self.console.vault = None
             self.pos = (0, 0)
@@ -311,7 +327,7 @@ class Window:
             if type(option) is str:
                 if i == self.pos[0]:
                     self.window.addstr(
-                        i + self.y_offset, 1, option, curses.A_REVERSE
+                        i + self.y_offset, 1, option, self.console.hl_color
                     )
                 else:
                     self.window.addstr(i + self.y_offset, 0, option)
@@ -325,11 +341,17 @@ class Window:
         length = self.size[1] // len(option)
         for i, col in enumerate(option):
             if selected:
-                window.addstr(y_offset, x_offset + 2, col, curses.A_REVERSE)
-                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
+                window.addstr(
+                    y_offset, x_offset + 1, col, self.console.hl_color
+                )
+                window.vline(
+                    y_offset, x_offset + length - 1, curses.ACS_VLINE, 1
+                )
             else:
-                window.addstr(y_offset, x_offset + 1, col)
-                window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
+                window.addstr(y_offset, x_offset, col)
+                window.vline(
+                    y_offset, x_offset + length - 1, curses.ACS_VLINE, 1
+                )
             x_offset += length
 
     async def navigate(self):
@@ -370,6 +392,7 @@ class Window:
         return padding
 
 
+# TODO: Add search functionality
 class ServiceWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Services")
@@ -378,21 +401,81 @@ class ServiceWindow(Window):
             "<A> Add service", "<D> Delete service",
             "<E> Edit service", "<ESC> Main menu"
         ]
+        self.service_list = None
 
     async def run(self):
         self.running = True
         self.window.erase()
+        self.update_service_list()
         while self.running:
             self.draw()
             await self.navigate()
             self.window.erase()
         self.window.refresh()
 
-    def select(self):
-        self.running = False
+    async def navigate(self):
+        key = self.window.getkey()
+        if key == "k" or key == "KEY_UP":
+            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+        if key == "j" or key == "KEY_DOWN":
+            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+        if key == "\n":
+            self.console.show_service.run(self.service_list[self.pos[0]])
+        if self.console.escape(key):
+            self.running = False
+        if key.lower() == "a":
+            self.console.add_service.run()
+            self.update_service_list()
+            await client.save_vault(
+                self.console.ws, self.console.user, self.console.vault
+            )
+        if key.lower() == "d":
+            self.delete_service()
+            self.update_service_list()
+            await client.save_vault(
+                self.console.ws, self.console.user, self.console.vault
+            )
+        if key.lower() == "e":
+            self.console.edit_service.run(self.service_list[self.pos[0]])
+            self.update_service_list()
+            await client.save_vault(
+                self.console.ws, self.console.user, self.console.vault
+            )
+        if key.lower() == "y":
+            self.copy_password()
+        self.draw()
+
+    def update_service_list(self):
+        if self.console.vault is None:
+            self.options = None
+            return
+        self.service_list = self.console.vault.services()
+        if self.service_list is None:
+            self.options = None
+            return
+        self.options = [
+            (service["service"], service["user"], service["notes"])
+            for service in self.service_list
+        ]
+        self.draw()
+
+    def delete_service(self):
+        if not self.console.msgbox.confirm(
+            "Are you sure you want to delete this service?"
+        ):
+            self.console.msgbox.info("Service not deleted")
+            return
+        service = self.service_list[self.pos[0]]
+        self.console.vault.delete(service["id"])
+        self.pos = (0, 0)
+        self.console.msgbox.info("Service deleted")
+
+    def copy_password(self):
+        service = self.service_list[self.pos[0]]
+        pyperclip.copy(service["password"])
+        self.console.msgbox.info("Password copied")
 
 
-# TODO: Finish this and the associated widgets
 class VaultWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Vaults")
@@ -443,11 +526,17 @@ class VaultWindow(Window):
     async def select(self):
         if self.options is None:
             return
-        self.console.vault = self.vault_list[self.pos[0]]
+        vault = self.vault_list[self.pos[0]]
+        self.console.vault = await client.get_vault(
+            self.console.ws, self.console.user, vault["name"]
+        )
         self.console.msgbox.info(
-            f"Selected vault: {self.console.vault['name']}"
+            f"Selected vault: {self.console.vault.name}"
         )
         self.running = False
+        self.console.main_menu.pos = (0, 0)
+        self.console.main_menu.draw()
+        await self.console.main_menu.select()
 
     async def delete_vault(self):
         if not self.console.msgbox.confirm(
@@ -492,6 +581,7 @@ class SettingsWindow(Window):
             await self.console.delete_account.run()
 
 
+# TODO: Make escape key close the widget
 class InputForm:
     def __init__(
         self, widget, prompt, pos, init_str="", secret=False, height=1
@@ -527,7 +617,10 @@ class InputForm:
         return key
 
     def get_input(self):
-        self.input_field.move(0, len(self.init_str))
+        if len(self.init_str) > 0:
+            self.input_field.move(0, len(self.init_str))
+        else:
+            self.input_field.move(0, 0)
         curses.curs_set(1)
         out = self.textbox.edit(self.validate)
         curses.curs_set(0)
@@ -570,9 +663,10 @@ class Widget:
     def clear(self):
         self.box.erase()
         self.box.refresh()
-        for text_field in self.text_fields:
-            text_field.input_field.erase()
-            text_field.input_field.refresh()
+        if self.text_fields is not None:
+            for text_field in self.text_fields:
+                text_field.input_field.erase()
+                text_field.input_field.refresh()
         self.widget.erase()
         self.widget.refresh()
 
@@ -812,6 +906,91 @@ class RenameVaultWidget(Widget):
             self.clear()
             return
         self.console.msgbox.info("Vault renamed")
+        self.clear()
+
+
+class AddServiceWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Add service")
+        self.service_form = InputForm(self.widget, "Service: ", (0, 0))
+        self.username_form = InputForm(self.widget, "Username: ", (1, 0))
+        self.password_form = InputForm(self.widget, "Password: ", (2, 0))
+        self.notes_form = InputForm(self.widget, "Notes: ", (3, 0))
+        self.text_fields = [
+            self.service_form, self.username_form,
+            self.password_form, self.notes_form
+        ]
+
+    def run(self):
+        self.running = True
+        self.password_form.init_str = generate_password()
+        self.draw()
+        service_name = self.service_form.get_input().strip()
+        if service_name == "":
+            self.console.msgbox.error("Service name cannot be empty")
+            self.clear()
+            return
+        username = self.username_form.get_input().strip()
+        password = self.password_form.get_input().strip()
+        notes = self.notes_form.get_input().strip()
+        self.console.vault.add(
+            service=service_name, user=username, password=password, notes=notes
+        )
+        self.console.msgbox.info("Service created")
+        self.clear()
+
+
+class EditServiceWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Edit service")
+
+    def run(self, service):
+        self.service_form = InputForm(
+            self.widget, "Service: ", (0, 0), init_str=service["service"]
+        )
+        self.username_form = InputForm(
+            self.widget, "Username: ", (1, 0), init_str=service["user"]
+        )
+        self.password_form = InputForm(
+            self.widget, "Password: ", (2, 0), init_str=service["password"],
+        )
+        self.notes_form = InputForm(
+            self.widget, "Notes: ", (3, 0), init_str=service["notes"]
+        )
+        self.text_fields = [
+            self.service_form, self.username_form,
+            self.password_form, self.notes_form
+        ]
+        self.running = True
+        self.draw()
+        service_name = self.service_form.get_input().strip()
+        if service_name == "":
+            self.console.msgbox.error("Service name cannot be empty")
+            self.clear()
+            return
+        username = self.username_form.get_input().strip()
+        password = self.password_form.get_input().strip()
+        notes = self.notes_form.get_input().strip()
+        self.console.vault.update(
+            service["id"], service_name, username, password, notes
+        )
+        self.console.msgbox.info("Service updated")
+        self.clear()
+
+
+class ShowServiceWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Service")
+
+    def run(self, service):
+        self.running = True
+        self.draw_box()
+        self.widget.addstr(0, 0, f"Service: {service['service']}")
+        self.widget.addstr(1, 0, f"Username: {service['user']}")
+        self.widget.addstr(2, 0, f"Password: {service['password']}")
+        self.widget.addstr(3, 0, f"Notes: {service['notes']}")
+        self.widget.addstr(8, 0, "Press any key to close")
+        self.widget.getkey()
         self.clear()
 
 
