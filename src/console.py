@@ -1,13 +1,12 @@
-import pyperclip
-import traceback
 import curses
 from curses import textpad
-import sys
+import pyperclip
 import re
 from . import client
 from .encryption import generate_password
 
 
+# TODO: Add password length option
 class Console:
     def __init__(self, ws, screen):
         self.ws = ws
@@ -35,14 +34,23 @@ class Console:
         self.register = RegisterWidget(self)
         self.main_menu = MainMenu(self)
         self.settings_window = SettingsWindow(self)
+        self.change_mpass = ChangeMpassWidget(self)
+        self.change_email = ChangeEmailWidget(self)
+        self.delete_account = DeleteAccountWidget(self)
         self.vault_window = VaultWindow(self)
+        self.add_vault = AddVaultWidget(self)
+        self.rename_vault = RenameVaultWidget(self)
         self.services_window = ServiceWindow(self)
 
     async def run(self):
         self.running = True
         while self.running:
-            self.start_menu.run()
-            await self.start_select()
+            if self.user is None:
+                self.main_menu.menu.erase()
+                await self.start_menu.run()
+            else:
+                self.start_menu.menu.erase()
+                await self.main_menu.run()
 
     def escape(self, key):
         try:
@@ -116,6 +124,15 @@ class MessageBox:
         self.msgbox.addstr(0, 0, f"ERROR: {message}", self.error_color)
         self.msgbox.refresh()
 
+    def confirm(self, message):
+        self.msgbox.erase()
+        self.draw_box()
+        self.msgbox.addstr(0, 0, f"CONFIRM: {message} [y/N]")
+        self.msgbox.refresh()
+        if self.msgbox.getkey().lower() == "y":
+            return True
+        return False
+
     def clear(self):
         self.box.erase()
         self.box.refresh()
@@ -164,14 +181,14 @@ class Menu:
             else:
                 self.menu.addstr(i, 0, option)
 
-    def navigate(self):
+    async def navigate(self):
         key = self.menu.getkey()
         if key == "k" or key == "KEY_UP":
             self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
         if key == "j" or key == "KEY_DOWN":
             self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
         if key == "\n":
-            self.running = False
+            await self.select()
         if self.console.escape(key):
             self.running = False
         self.draw()
@@ -182,13 +199,22 @@ class StartMenu(Menu):
         super().__init__(console, "Start Menu")
         self.options = ["1. Login", "2. Register", "3. Exit"]
 
-    def run(self):
+    async def run(self):
         self.running = True
         self.menu.erase()
         while self.running:
             self.draw()
-            self.navigate()
+            await self.navigate()
             self.menu.erase()
+
+    async def select(self):
+        self.running = False
+        if self.pos[0] == 0:
+            await self.console.login.run()
+        if self.pos[0] == 1:
+            await self.console.register.run()
+        if self.pos[0] == 2:
+            self.console.running = False
 
 
 class MainMenu(Menu):
@@ -198,31 +224,37 @@ class MainMenu(Menu):
             "1. Services", "2. Vaults", "3. Settings", "4. Logout", "5. Exit"
         ]
 
-    def run(self):
+    async def run(self):
         self.running = True
         self.menu.erase()
         curses.curs_set(0)
         while self.running:
             self.draw()
-            self.navigate()
+            await self.navigate()
             self.menu.erase()
 
-    def select(self):
+    async def select(self):
+        self.running = False
         if self.pos[0] == 0:
-            pass
+            await self.console.services_window.run()
         if self.pos[0] == 1:
-            pass
+            await self.console.vault_window.run()
         if self.pos[0] == 2:
-            pass
+            await self.console.settings_window.run()
         if self.pos[0] == 3:
-            pass
-        if self.pos[0] == 4:
+            self.console.user = None
+            self.console.vault = None
+            self.pos = (0, 0)
             self.running = False
+            self.console.msgbox.info("Logged out")
+        if self.pos[0] == 4:
+            self.console.running = False
 
 
 class Window:
-    def __init__(self, console, title="Window"):
+    def __init__(self, console, title):
         self.console = console
+        self.title = title
         self.box_size = (
             self.console.screen_size[0] - 3,
             self.console.screen_size[1] * 4 // 5
@@ -242,12 +274,19 @@ class Window:
         self.keybinds = None
         self.options = None
         self.y_offset = 0
+        self.pos = (0, 0)
 
     def draw(self):
         self.draw_box()
         self.draw_keybinds()
         self.draw_options()
         self.window.refresh()
+
+    def draw_box(self):
+        self.box.erase()
+        self.box.box()
+        self.box.addstr(0, 1, self.title)
+        self.box.refresh()
 
     def draw_keybinds(self):
         if self.keybinds is None:
@@ -293,15 +332,15 @@ class Window:
                 window.vline(y_offset, x_offset + length, curses.ACS_VLINE, 1)
             x_offset += length
 
-    def navigate(self):
+    async def navigate(self):
         key = self.window.getkey()
         if key == "k" or key == "KEY_UP":
             self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
         if key == "j" or key == "KEY_DOWN":
             self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
         if key == "\n":
-            self.running = False
-        if self.escape(key):
+            await self.select()
+        if self.console.escape(key):
             self.running = False
         self.draw()
 
@@ -331,6 +370,29 @@ class Window:
         return padding
 
 
+class ServiceWindow(Window):
+    def __init__(self, console):
+        super().__init__(console, "Services")
+        self.keybinds = [
+            "<Y> Copy password", "<Enter> Show service",
+            "<A> Add service", "<D> Delete service",
+            "<E> Edit service", "<ESC> Main menu"
+        ]
+
+    async def run(self):
+        self.running = True
+        self.window.erase()
+        while self.running:
+            self.draw()
+            await self.navigate()
+            self.window.erase()
+        self.window.refresh()
+
+    def select(self):
+        self.running = False
+
+
+# TODO: Finish this and the associated widgets
 class VaultWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Vaults")
@@ -338,26 +400,69 @@ class VaultWindow(Window):
             "<Enter> Select vault", "<A> Add vault",
             "<D> Delete vault", "<R> Rename vault", "<ESC> Main menu"
         ]
+        self.options = None
+        self.vault_list = None
 
-    def run(self):
+    async def run(self):
         self.running = True
         self.window.erase()
+        await self.update_vault_list()
         while self.running:
             self.draw()
-            self.navigate()
+            await self.navigate()
             self.window.erase()
+        self.window.refresh()
 
-    def select(self):
-        if self.pos[0] == 0:
-            pass
-        if self.pos[0] == 1:
-            pass
-        if self.pos[0] == 2:
-            pass
-        if self.pos[0] == 3:
-            pass
-        if self.pos[0] == 4:
+    async def navigate(self):
+        key = self.window.getkey()
+        if key == "k" or key == "KEY_UP":
+            self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
+        if key == "j" or key == "KEY_DOWN":
+            self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
+        if key == "\n":
+            await self.select()
+        if self.console.escape(key):
             self.running = False
+        if key.lower() == "a":
+            await self.console.add_vault.run()
+            await self.update_vault_list()
+        if key.lower() == "d":
+            await self.delete_vault()
+        if key.lower() == "r":
+            await self.console.rename_vault.run(self.options[self.pos[0]])
+            await self.update_vault_list()
+        self.draw()
+
+    async def update_vault_list(self):
+        self.vault_list = await client.get_vaults(
+            self.console.ws, self.console.user
+        )
+        self.options = [vault["name"] for vault in self.vault_list]
+        self.draw()
+
+    async def select(self):
+        if self.options is None:
+            return
+        self.console.vault = self.vault_list[self.pos[0]]
+        self.console.msgbox.info(
+            f"Selected vault: {self.console.vault['name']}"
+        )
+        self.running = False
+
+    async def delete_vault(self):
+        if not self.console.msgbox.confirm(
+            "Are you sure you want to delete this vault?"
+        ):
+            self.console.msgbox.info("Vault not deleted")
+            return
+        vault_name = self.options[self.pos[0]]
+        if not await client.delete_vault(
+            self.console.ws, self.console.user, vault_name
+        ):
+            self.console.msgbox.error("Failed to delete vault")
+        await self.update_vault_list()
+        self.pos = (0, 0)
+        self.console.msgbox.info("Vault deleted")
 
 
 class SettingsWindow(Window):
@@ -368,45 +473,23 @@ class SettingsWindow(Window):
             "3. Delete account"
         ]
 
-    def run(self):
+    async def run(self):
         self.running = True
         self.window.erase()
         while self.running:
             self.draw()
-            self.navigate()
+            await self.navigate()
             self.window.erase()
+        self.window.refresh()
 
-
-class ServiceWindow(Window):
-    def __init__(self, console):
-        super().__init__(console, "Services")
-        self.keybinds = [
-            "<Y> Copy password", "<Enter> Show service",
-            "<A> Add service", "<D> Delete service",
-            "<E> Edit service", "<ESC> Main menu"
-        ]
-
-    def run(self):
-        self.running = True
-        self.window.erase()
-        while self.running:
-            self.draw()
-            self.navigate()
-            self.window.erase()
-
-    def select(self):
+    async def select(self):
+        self.running = False
         if self.pos[0] == 0:
-            pass
+            await self.console.change_mpass.run()
         if self.pos[0] == 1:
-            pass
+            await self.console.change_email.run()
         if self.pos[0] == 2:
-            pass
-        if self.pos[0] == 3:
-            pass
-        if self.pos[0] == 4:
-            pass
-        if self.pos[0] == 5:
-            self.running = False
+            await self.console.delete_account.run()
 
 
 class InputForm:
@@ -524,7 +607,7 @@ class LoginWidget(Widget):
             return None
         self.console.msgbox.info("Logged in")
         self.clear()
-        return user
+        self.console.user = user
 
 
 class RegisterWidget(Widget):
@@ -567,6 +650,124 @@ class RegisterWidget(Widget):
         self.clear()
 
 
+class DeleteAccountWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Delete account")
+        self.mpass_form = InputForm(
+            self.widget, "Master password: ", (0, 0), secret=True
+        )
+        self.text_fields = [self.mpass_form]
+
+    async def run(self):
+        self.running = True
+        self.draw()
+        mpass = self.mpass_form.get_input()
+        if len(mpass) < 8:
+            self.console.msgbox.error("Must be at least 8 characters long")
+            self.clear()
+            return
+        if not self.console.msgbox.confirm(
+            "Are you sure you want to delete your account?"
+        ):
+            self.console.msgbox.info("Account not deleted")
+            self.clear()
+            return
+        if not await client.delete_account(
+            self.console.ws, self.console.user, mpass
+        ):
+            self.console.msgbox.error("Failed to delete account")
+            self.clear()
+            return
+        self.console.msgbox.info("Account deleted")
+        self.clear()
+        self.console.vault = None
+        self.console.user = None
+
+
+class ChangeEmailWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Change email")
+        self.email_form = InputForm(self.widget, "New Email: ", (0, 0))
+        self.mpass_form = InputForm(
+            self.widget, "Master password: ", (1, 0), secret=True
+        )
+        self.text_fields = [self.email_form, self.mpass_form]
+
+    async def run(self):
+        self.running = True
+        self.draw()
+        new_email = self.email_form.get_input()
+        if len(new_email) < 8:
+            self.console.msgbox.error("Must be at least 8 characters long")
+            self.clear()
+            return
+        mpass = self.mpass_form.get_input()
+        if len(mpass) < 8:
+            self.console.msgbox.error("Must be at least 8 characters long")
+            self.clear()
+            return
+        if not await client.change_email(
+            self.console.ws, self.console.user, new_email, mpass
+        ):
+            self.console.msgbox.error("Failed to change email")
+            self.clear()
+            return
+        self.console.user = await client.auth(
+            self.console.ws, new_email, mpass
+        )
+        self.console.msgbox.info("Email changed")
+        self.clear()
+
+
+class ChangeMpassWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Change master password")
+        self.old_mpass_form = InputForm(
+            self.widget, "Old master password: ", (0, 0), secret=True
+        )
+        self.new_mpass_form = InputForm(
+            self.widget, "New master password: ", (1, 0), secret=True
+        )
+        self.repeat_new_mpass_form = InputForm(
+            self.widget, "Repeat new master password:",
+            (2, 0), secret=True
+        )
+        self.text_fields = [
+            self.old_mpass_form, self.new_mpass_form,
+            self.repeat_new_mpass_form
+        ]
+
+    async def run(self):
+        self.running = True
+        self.draw()
+        old_mpass = self.old_mpass_form.get_input()
+        if len(old_mpass) < 8:
+            self.console.msgbox.error("Must be at least 8 characters long")
+            self.clear()
+            return
+        new_mpass = self.new_mpass_form.get_input()
+        if len(new_mpass) < 8:
+            self.console.msgbox.error("Must be at least 8 characters long")
+            self.clear()
+            return
+        repeat_new_mpass = self.repeat_new_mpass_form.get_input()
+        if new_mpass != repeat_new_mpass:
+            self.console.msgbox.error("Passwords do not match")
+            self.clear()
+            return
+        if not await client.change_mkey(
+            self.console.ws, self.console.user, old_mpass, new_mpass
+        ):
+            self.console.msgbox.error("Failed to change master password")
+            self.clear()
+            return
+        self.console.user = await client.auth(
+            self.console.ws, self.console.user["email"], new_mpass
+        )
+        self.console.msgbox.info("Master password changed")
+        self.clear()
+
+
 class AddVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Add vault")
@@ -580,11 +781,37 @@ class AddVaultWidget(Widget):
         if vault_name == "":
             self.clear()
             return
-        if not await client.create_vault(self.console.ws, vault_name):
+        if not await client.create_vault(
+            self.console.ws, self.console.user, vault_name
+        ):
             self.console.msgbox.error("Failed to create vault")
             self.clear()
             return
         self.console.msgbox.info("Vault created")
+        self.clear()
+
+
+class RenameVaultWidget(Widget):
+    def __init__(self, console):
+        super().__init__(console, "Rename vault")
+        self.vault_name_form = InputForm(
+            self.widget, "New vault name: ", (0, 0))
+        self.text_fields = [self.vault_name_form]
+
+    async def run(self, vault_name):
+        self.running = True
+        self.draw()
+        new_vault_name = self.vault_name_form.get_input()
+        if new_vault_name == "":
+            self.clear()
+            return
+        if not await client.update_vault_name(
+            self.console.ws, self.console.user, vault_name, new_vault_name
+        ):
+            self.console.msgbox.error("Failed to rename vault")
+            self.clear()
+            return
+        self.console.msgbox.info("Vault renamed")
         self.clear()
 
 
