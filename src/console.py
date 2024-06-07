@@ -163,7 +163,10 @@ class MessageBox:
             self.query = self.search_box.gather().strip() + chr(key)
             self.console.services_window.update_service_list()
         if key == 8:
-            self.query = self.search_box.gather().strip()[:-2]
+            self.query = self.search_box.gather().strip()
+            self.console.services_window.update_service_list()
+        if key == 263:
+            self.query = self.search_box.gather().strip()[:-1]
             self.console.services_window.update_service_list()
         if key == 10:
             return 7
