@@ -107,9 +107,19 @@ class MessageBox:
             self.size[0] - 2, self.size[1] - 2,
             self.loc[0] + 1, self.loc[1] + 1
         )
+        self.size = self.msgbox.getmaxyx()
+        self.loc = self.msgbox.getbegyx()
         self.msgbox.keypad(True)
         self.title = "Messages"
         self.error_color = self.console.error_color
+        self.search_prompt = "Search: "
+        self.search_field = self.msgbox.subpad(
+            0, self.size[1] - len(self.search_prompt),
+            self.loc[0], self.loc[1] + len(self.search_prompt)
+        )
+        self.search_field.keypad(True)
+        self.search_box = textpad.Textbox(self.search_field, insert_mode=True)
+        self.query = None
 
     def draw_box(self):
         self.box.erase()
@@ -142,6 +152,37 @@ class MessageBox:
         self.box.erase()
         self.box.refresh()
         self.msgbox.erase()
+        self.msgbox.refresh()
+
+    def search_validate(self, key):
+        if key == 27:
+            self.query = None
+            self.console.services_window.update_service_list()
+            return 7
+        if key > 32 or key < 126:
+            self.query = self.search_box.gather().strip() + chr(key)
+            self.console.services_window.update_service_list()
+        if key == 8:
+            self.query = self.search_box.gather().strip()[:-2]
+            self.console.services_window.update_service_list()
+        if key == 10:
+            return 7
+        return key
+
+    def search(self):
+        self.msgbox.erase()
+        self.draw_box()
+        self.msgbox.addstr(0, 0, self.search_prompt)
+        self.msgbox.refresh()
+        if self.query is not None:
+            self.search_field.addstr(0, 0, self.query)
+        self.search_field.refresh()
+        curses.curs_set(1)
+        self.query = self.search_box.edit(self.search_validate).strip()
+        curses.curs_set(0)
+        self.console.services_window.update_service_list()
+        if self.query is None:
+            self.msgbox.erase()
         self.msgbox.refresh()
 
 
@@ -416,13 +457,21 @@ class ServiceWindow(Window):
     async def navigate(self):
         key = self.window.getkey()
         if self.console.escape(key):
-            self.running = False
+            if self.console.msgbox.query is not None:
+                self.console.msgbox.query = None
+                self.console.msgbox.msgbox.erase()
+                self.console.msgbox.msgbox.refresh()
+                self.update_service_list()
+            else:
+                self.running = False
         if key.lower() == "a":
             self.console.add_service.run()
             self.update_service_list()
             await client.save_vault(
                 self.console.ws, self.console.user, self.console.vault
             )
+        if key == "/":
+            self.console.msgbox.search()
         if self.options is not None:
             if key == "k" or key == "KEY_UP":
                 self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
@@ -451,13 +500,25 @@ class ServiceWindow(Window):
             self.options = None
             return
         self.service_list = self.console.vault.services()
+        if self.console.msgbox.query is not None:
+            self.service_list = [
+                service for service in self.service_list
+                if re.search(
+                    self.console.msgbox.query, service["service"],
+                    re.IGNORECASE
+                ) is not None
+            ]
+            if self.service_list == 0:
+                self.options = None
+                return
         if self.service_list is None:
             self.options = None
             return
-        self.options = [
-            (service["service"], service["user"], service["notes"])
-            for service in self.service_list
-        ]
+        else:
+            self.options = [
+                (service["service"], service["user"], service["notes"])
+                for service in self.service_list
+            ]
         self.draw()
 
     def delete_service(self):
