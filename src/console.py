@@ -169,6 +169,8 @@ class MessageBox:
             self.query = self.search_box.gather().strip()[:-1]
             self.console.services_window.update_service_list()
         if key == 10:
+            self.query = self.search_box.gather().strip()
+            self.console.services_window.update_service_list()
             return 7
         return key
 
@@ -181,10 +183,12 @@ class MessageBox:
             self.search_field.addstr(0, 0, self.query)
         self.search_field.refresh()
         curses.curs_set(1)
-        self.query = self.search_box.edit(self.search_validate).strip()
+        self.search_box.edit(self.search_validate).strip()
         curses.curs_set(0)
-        self.console.services_window.update_service_list()
         if self.query is None:
+            self.search_field.erase()
+            self.search_field.move(0, 0)
+            self.search_field.refresh()
             self.msgbox.erase()
         self.msgbox.refresh()
 
@@ -436,7 +440,6 @@ class Window:
         return padding
 
 
-# TODO: Add search functionality
 class ServiceWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Services")
@@ -464,6 +467,8 @@ class ServiceWindow(Window):
                 self.console.msgbox.query = None
                 self.console.msgbox.msgbox.erase()
                 self.console.msgbox.msgbox.refresh()
+                self.console.msgbox.search_field.erase()
+                self.console.msgbox.search_field.move(0, 0)
                 self.update_service_list()
             else:
                 self.running = False
