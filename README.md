@@ -12,7 +12,9 @@ Store your passwords in an encrypted vault, and send them back to the server for
 git clone https://github.com/lassejep/ljk.git
 cd ljk
 pip install -r requirements.txt
+python -m unittest
 '''
+Make sure all tests pass before running the server and client.
 
 ## Usage
 ### Server
