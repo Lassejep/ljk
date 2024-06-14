@@ -12,7 +12,6 @@ def start(screen):
 
 
 async def main(screen):
-    # TODO: Use a real certificate
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     localhost_pem = pathlib.Path(__file__).with_name("localhost.pem")
     ssl_context.load_verify_locations(localhost_pem)
