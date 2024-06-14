@@ -1,0 +1,4 @@
+websockets
+argon2-cffi
+cryptography
+pyperclip

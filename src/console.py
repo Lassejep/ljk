@@ -6,7 +6,6 @@ from . import client
 from .encryption import generate_password
 
 
-# TODO: Add password length option
 class Console:
     def __init__(self, ws, screen):
         self.ws = ws
