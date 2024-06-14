@@ -30,3 +30,15 @@ python client.py --host <ip> -p <port> -s <path to ssl certificate>
 
 ## How it works
 ![Login Diagram](./login_diagram.png)
+
+'''mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: Connect
+    S->>C: Send public key
+    C->>S: Send encrypted master password
+    S->>C: Send encrypted user data
+    C->>S: Send encrypted command
+    S->>C: Send encrypted response
+'''
