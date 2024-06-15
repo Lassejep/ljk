@@ -85,7 +85,7 @@ if __name__ == "__main__":
         help="Path to the user database file"
     )
     parser.add_argument(
-        "--host",
+        "-H", "--host",
         default="0.0.0.0",
         help="Host to listen on"
     )
@@ -106,10 +106,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.ssl is None:
-        args.ssl = path.join(current_dir, "localhost.pem")
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_context.load_cert_chain(args.ssl)
+    if args.ssl is not None:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(args.ssl)
+    else:
+        ssl_context = None
     timestamp = datetime.now().strftime("%Y-%m-%d")
     if not path.exists(args.log_dir):
         mkdir(args.log_dir)
