@@ -7,6 +7,8 @@ Store your passwords in an encrypted vault, and send them back to the server for
 - Python 3.6 or later
 - Linux
 
+If you want to use SSL, you need to have a certificate and key file, or openssl installed.
+
 ## Installation
 ```bash
 git clone https://github.com/lassejep/ljk.git
@@ -17,6 +19,20 @@ python -m unittest
 Make sure all tests pass before running the server and client.
 
 ## Usage
+### SSL
+If you want SSL enabled, and you don't have a certificate and key file, you can generate them with openssl using the following command.
+```bash
+openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout server.key -out server.crt
+cat server.crt server.key > server.pem
+```
+Then simply fill out the information asked for.
+
+
+This will generate a certificate and key file, and combine them into a single file.
+When running the server you can use the `server.pem` file as the certificate.
+Note that this is a self-signed certificate, and the private key is not protected by a password.
+If you want to protect the private key with a password, you can remove the `-nodes` flag from the command above.
+
 ### Server
 Run the server on a machine that you want to store your user database on.
 ```bash
