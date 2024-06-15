@@ -36,13 +36,14 @@ If you want to protect the private key with a password, you can remove the `-nod
 ### Server
 Run the server on a machine that you want to store your user database on.
 ```bash
-python server.py --host <ip> -p <port> -d <database name> -l <log directory> -s <path to ssl certificate>
+python server.py -H <ip> -p <port> -d <database name> -l <log directory> -s <path to ssl certificate>
 ```
 ### Client
 Run the client on a machine that you want to access your user database from.
 ```bash
-python client.py --host <ip> -p <port> -s <path to ssl certificate>
+python client.py -H <ip> -p <port>
 ```
+The client should open a simple CLI interface where you can register, login, and store and retrieve passwords.
 
 ## How it works
 ```mermaid
@@ -90,22 +91,55 @@ title: Create and Store Vault
 ---
 graph LR
     subgraph Client
-    mail1{Email}
-    mpass{"Master \n Password"}
-    mail1 & mpass --> f1([Generate Data and Master Keys])
-    f1 --> dkey[Data Key]
-    f1 --> mkey[Master Key]
-    vkey{"Vault Key \n (Random 256 bit key)"}
-    vault{Vault}
-    vkey -->|Encryption Key| f2([AES-GCM])
-    vault -->|Data| f2
-    f2 -->|Encrypt| evault[Encrypted Vault]
-    vkey -->|Data| f3([AES-GCM])
-    dkey -->|Encryption Key| f3
-    f3 -->|Encrypt| edkey[Encrypted Vault Key]
-end
+        mail1{Email}
+        mpass{"Master \n Password"}
+        mail1 & mpass --> f1([Generate Data and Master Keys])
+        f1 --> dkey[Data Key]
+        f1 --> mkey[Master Key]
+        vkey{"Vault Key \n (Random 256 bit key)"}
+        vault{Vault}
+        vkey -->|Encryption Key| f2([AES-GCM])
+        vault -->|Data| f2
+        f2 -->|Encrypt| evault[Encrypted Vault]
+        vkey -->|Data| f3([AES-GCM])
+        dkey -->|Encryption Key| f3
+        f3 -->|Encrypt| evkey[Encrypted Vault Key]
+    end
     subgraph Server
-    edkey -->|Store| db[(Database)]
-    evault -->|Store| db
-end
+        evkey -->|Store| db[(Database)]
+        evault -->|Store| db
+    end
+```
+```mermaid
+---
+title: Login and Retrieve Vault
+---
+graph LR
+    subgraph Client
+        mpass{"Master \n Password"}
+        mail1{Email}
+        mail1 & mpass --> f1([Generate Data and Master Keys])
+        f1 --> dkey[Data Key]
+        f1 --> mkey[Master Key]
+        evault2{Encrypted Vault} -->|Data| f4([AES-GCM])
+        evkey2{Encrypted Vault Key} -->|Data| f3([AES-GCM])
+        dkey -->|Encryption Key| f3
+        f3 -->|Decrypt| vkey{"Vaultk Key"}
+        vkey -->|Data| f4
+        f4 -->|Decrypt| vault{Vault}
+    end
+    mail1 -->|Login Request| Server
+    mkey -->|Login Request| Server
+    subgraph Server
+        mail2{Email} -->|Retrieve Auth Key| db[(Database)]
+        mkey2{Master Key} -->|Data| f2([Argon2])
+        f2 -->|Hash| akey[Auth Key]
+        db --> akey2[Auth Key]
+        akey2 -->|Compare| akey
+        akey -->|Retrieve Encrypted data| db
+        db -->|Data| evault[Encrypted Vault]
+        db -->|Data| evkey[Encrypted Vault Key]
+    end
+        evault -->|Response| Client
+        evkey -->|Response| Client
 ```
