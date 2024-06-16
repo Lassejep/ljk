@@ -33,6 +33,11 @@ When running the server you can use the `server.pem` file as the certificate.
 Note that this is a self-signed certificate, and the private key is not protected by a password.
 If you want to protect the private key with a password, you can remove the `-nodes` flag from the command above.
 
+If you still have trouble with SSL, try adding the following line to the end of the openssl command.
+```bash
+--addext "subjectAltName = IP:<ip>"
+```
+
 ### Server
 Run the server on a machine that you want to store your user database on.
 ```bash
