@@ -4,7 +4,6 @@ import websockets
 import asyncio
 import curses
 import argparse
-from time import sleep
 from src import console
 
 
@@ -14,10 +13,7 @@ def start(screen, host, port):
 
 async def main(screen, host, port):
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    print(f"Connecting to wss://{host}:{port}")
     ssl_cert = ssl.get_server_certificate((host, port))
-    print(ssl_cert)
-    sleep(3)
     ssl_context.load_verify_locations(cadata=ssl_cert)
 
     async with websockets.connect(
