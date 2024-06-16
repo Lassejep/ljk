@@ -18,7 +18,7 @@ python -m unittest
 ```
 Make sure all tests pass before running the server and client.
 
-## Usage
+## Setup
 ### SSL
 If you want SSL enabled, and you don't have a certificate and key file, you can generate them with openssl using the following command.
 ```bash
@@ -41,14 +41,26 @@ If you still have trouble with SSL, try adding the following line to the end of 
 ### Server
 Run the server on a machine that you want to store your user database on.
 ```bash
-python server.py -H <ip> -p <port> -d <database name> -l <log directory> -s <path to ssl certificate>
+python server.py -H <host> -p <port> -d <database name> -l <log directory> -s <path to ssl certificate>
 ```
+
 ### Client
 Run the client on a machine that you want to access your user database from.
 ```bash
-python client.py -H <ip> -p <port>
+python client.py -H <host> -p <port>
 ```
 The client should open a simple CLI interface where you can register, login, and store and retrieve passwords.
+
+## To Do
+- [ ] Make the client work with small screens
+- [ ] Add configuration file for the client
+- [ ] Add configuration file for the server
+- [ ] Implement proper session handling
+- [ ] Fix error logging when requesting empty vault list
+- [ ] Make input fields work with longer strings
+- [ ] Make vault and service lists scrollable
+- [ ] Test on Windows and MacOS
+- [ ] Add debian/ubuntu installation steps to README
 
 ## How it works
 ```mermaid
@@ -68,6 +80,7 @@ graph LR
         f2 -->|Hash| mkey[Master Key]
     end
 ```
+
 ```mermaid
 ---
 title: Register
@@ -90,6 +103,7 @@ graph LR
         akey -->|Store| db[(Database)]
     end
 ```
+
 ```mermaid
 ---
 title: Create and Store Vault
@@ -115,6 +129,7 @@ graph LR
         evault -->|Store| db
     end
 ```
+
 ```mermaid
 ---
 title: Login and Retrieve Vault
