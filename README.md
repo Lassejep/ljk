@@ -52,7 +52,7 @@ Run the client on a machine that you want to access your user database from.
 ```bash
 python client.py -H <host> -p <port>
 ```
-The client should open a simple CLI interface where you can register, login, and store and retrieve passwords.
+The client should open a simple UI where you can register, login, and store and retrieve passwords.
 
 ## To Do
 - [ ] Make the client work with small screens
