@@ -63,7 +63,6 @@ The client should open a simple UI where you can register, login, and store and 
 - [ ] Add configuration file for the client
 - [ ] Add configuration file for the server
 - [ ] Implement proper session handling
-- [ ] Fix error logging when requesting empty vault list
 - [ ] Make input fields work with longer strings
 - [ ] Make vault and service lists scrollable
 - [ ] Test on Windows and MacOS

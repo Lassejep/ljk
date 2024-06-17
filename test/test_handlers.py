@@ -93,7 +93,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             self.ws, message, self.db, self.rhost, self.rport
         )
         response = await self.ws.recv()
-        self.assertEqual(response["status"], "failed", response)
+        self.assertEqual(response["vaults"], None, response)
         message = {
             "uid": 1,
             "vault_name": "test_vault",
