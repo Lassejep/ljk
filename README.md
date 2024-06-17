@@ -61,6 +61,7 @@ The client should open a simple CLI interface where you can register, login, and
 - [ ] Make vault and service lists scrollable
 - [ ] Test on Windows and MacOS
 - [ ] Add debian/ubuntu installation steps to README
+- [ ] Add server backup and restore functionality
 
 ## How it works
 ```mermaid
