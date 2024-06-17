@@ -19,6 +19,10 @@ cd ljk
 pip install -r requirements.txt
 python -m unittest
 ```
+If you are having trouble with the `cryptography` package, try running the following command.
+```bash
+sudo apt get install build-essential libssl-dev libffi-dev python3-dev cargo pkg-config
+```
 Make sure all tests pass before running the server and client.
 
 ## Setup
