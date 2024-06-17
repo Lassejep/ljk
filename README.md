@@ -1,4 +1,7 @@
+# !!! WARNING !!!
+This password manager is not secure yet, and should not be used to store sensitive information.
 # A Simple CLI Password Manager
+
 This is a simple CLI password manager written in Python.
 Run a server on a machine, access it from another machine through the client using a master password.
 Store your passwords in an encrypted vault, and send them back to the server for storage.
