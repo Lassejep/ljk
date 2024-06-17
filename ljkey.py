@@ -12,9 +12,12 @@ def start(screen, host, port):
 
 
 async def main(screen, host, port):
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ssl_cert = ssl.get_server_certificate((host, port))
-    ssl_context.load_verify_locations(cadata=ssl_cert)
+    try:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_cert = ssl.get_server_certificate((host, port))
+        ssl_context.load_verify_locations(cadata=ssl_cert)
+    except ssl.SSLError:
+        ssl_context = None
 
     async with websockets.connect(
         f"wss://{host}:{port}", ping_interval=None, ssl=ssl_context

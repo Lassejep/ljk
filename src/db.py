@@ -141,7 +141,7 @@ class Database:
                 } for vault in vaults
             ]
         else:
-            raise Exception(f"User with id: {uid} has no vaults")
+            return None
 
     def get_vault(self, uid, name):
         self.cursor.execute(

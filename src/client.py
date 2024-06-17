@@ -101,7 +101,7 @@ async def get_vaults(websocket, user):
     msg = pickle.dumps({"command": "get_vaults", "uid": user["id"]})
     await websocket.send(msg)
     response = pickle.loads(await websocket.recv())
-    if response["status"] == "failed":
+    if response["status"] == "failed" or response["vaults"] is None:
         return None
     vaults = response["vaults"]
     return vaults
