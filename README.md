@@ -7,8 +7,8 @@ Run a server on a machine, access it from another machine through the client usi
 Store your passwords in an encrypted vault, and send them back to the server for storage.
 
 ## Requirements
-- Python 3.6 or later
-- Linux
+- Python 3.11 or higher
+- Linux or WSL
 
 If you want to use SSL, you need to have a certificate and key file, or openssl installed.
 
@@ -21,7 +21,7 @@ python -m unittest
 ```
 If you are having trouble with the `cryptography` package, try running the following command.
 ```bash
-sudo apt get install build-essential libssl-dev libffi-dev python3-dev cargo pkg-config
+sudo apt-get install build-essential libssl-dev libffi-dev python3-dev cargo pkg-config
 ```
 Make sure all tests pass before running the server and client.
 
