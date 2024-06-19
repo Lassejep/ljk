@@ -8,7 +8,8 @@ Store your passwords in an encrypted vault, and send them back to the server for
 
 ## Requirements
 - Python 3.11 or higher
-- Linux or WSL
+- A Linux machine or WSL
+- Git
 
 If you want to use SSL, you need to have a certificate and key file, or openssl installed.
 
