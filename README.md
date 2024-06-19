@@ -8,7 +8,7 @@ Store your passwords in an encrypted vault, and send them back to the server for
 
 ## Requirements
 - Python 3.11 or higher
-- A Linux machine or WSL
+- WSL (Windows Subsystem for Linux) if you are running Windows
 - Git
 
 If you want to use SSL, you need to have a certificate and key file, or openssl installed.
@@ -66,7 +66,6 @@ The client should open a simple UI where you can register, login, and store and 
 - [ ] Implement proper session handling
 - [ ] Make input fields work with longer strings
 - [ ] Make vault and service lists scrollable
-- [ ] Test on Windows and MacOS
 - [ ] Add server backup and restore functionality
 
 ## How it works
