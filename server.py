@@ -13,8 +13,7 @@ from os import path, mkdir
 from src import db, handlers
 
 
-async def handler(ws, db_path):
-    database = db.Database(db_path)
+async def handler(ws, database):
     lhost, lport = ws.local_address
     logging.info(f"Connected to {lhost}:{lport}")
     while True:
@@ -63,11 +62,17 @@ async def handler(ws, db_path):
                 await handlers.invalid_command(ws, msg, rhost, rport)
 
 
-async def main(
-        host="0.0.0.0", port=8765, ssl_context=None, db_path="users.db"
-):
-    bound_handler = functools.partial(handler, db_path=db_path)
+async def db_backup(database, backup_dir):
+    while True:
+        await asyncio.sleep(3600 * 6)
+        try:
+            await database.backup(backup_dir)
+        except Exception as e:
+            logging.error(f"Backup error: {e}")
 
+
+async def run_server(host, port, ssl_context, database):
+    bound_handler = functools.partial(handler, database=database)
     async with serve(
         bound_handler, host, port,
         logger=logging.getLogger(),
@@ -75,6 +80,22 @@ async def main(
         ping_interval=None
     ):
         await asyncio.Future()
+
+
+def main(
+        host="0.0.0.0", port=8765, ssl_context=None, db_path="users.db"
+):
+    database = db.Database(db_path)
+    backup_dir = path.join(path.dirname(db_path), "backups")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    tasks = [
+        loop.create_task(run_server(host, port, ssl_context, database)),
+        loop.create_task(db_backup(database, backup_dir))
+    ]
+    loop.run_until_complete(asyncio.wait(tasks))
+    loop.close()
+
 
 if __name__ == "__main__":
     current_dir = pathlib.Path(__file__).parent
@@ -131,7 +152,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            asyncio.run(main(args.host, args.port, ssl_context, args.database))
+            main(args.host, args.port, ssl_context, args.database)
         except KeyboardInterrupt:
             print("Stopping server")
             break

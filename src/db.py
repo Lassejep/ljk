@@ -1,4 +1,6 @@
 import sqlite3
+from datetime import datetime
+import traceback
 
 
 class Database:
@@ -209,3 +211,16 @@ class Database:
             """UPDATE vaults SET data = ? WHERE uid = ? AND name = ?""",
             (data, uid, name)
         )
+
+    async def backup(self, backup_dir):
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            backup_name = f"{backup_dir}/backup_{timestamp}.db"
+            backup_conn = sqlite3.connect(backup_name)
+            self.connection.backup(backup_conn)
+            backup_conn.commit()
+            backup_conn.close()
+            return backup_name
+        except Exception as e:
+            traceback.print_exc()
+            raise Exception(f"Failed to backup database: {e}")
