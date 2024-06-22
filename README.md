@@ -62,7 +62,7 @@ The client should open a simple UI where you can register, login, and store and 
 ## To Do
 - [ ] Make the client work with small screens
 - [ ] Add configuration file for the client
-- [ ] Add configuration file for the server
+- [x] Add configuration file for the server
 - [ ] Implement proper session handling
 - [ ] Make input fields work with longer strings
 - [ ] Make vault and service lists scrollable
