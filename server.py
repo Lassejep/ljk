@@ -100,7 +100,7 @@ def create_config():
     current_dir = pathlib.Path(__file__).parent
     config["server"] = {
         "host": "0.0.0.0",
-        "port": "5050",
+        "port": "5039",
         "ssl_path": "",
         "log_dir": f"{current_dir}/logs",
         "database": f"{current_dir}/users.db",

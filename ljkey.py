@@ -14,7 +14,7 @@ def create_config():
     config = configparser.ConfigParser()
     config["Client"] = {
         "host": "0.0.0.0",
-        "port": "8765",
+        "port": "5039",
     }
 
     with open(f"{current_dir}/client.conf", "w") as configfile:
