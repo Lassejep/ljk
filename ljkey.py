@@ -78,13 +78,10 @@ async def main(screen, host, port):
     except ssl.SSLError:
         ssl_context = None
 
-    try:
-        async with websockets.connect(
-            f"wss://{host}:{port}", ping_interval=None, ssl=ssl_context
-        ) as websocket:
-            await console.run(screen, websocket)
-    except websockets.exceptions.ConnectionClosedError:
-        print("Could not connect to server")
+    async with websockets.connect(
+        f"wss://{host}:{port}", ping_interval=None, ssl=ssl_context
+    ) as websocket:
+        await console.run(screen, websocket)
 
 
 if __name__ == "__main__":
@@ -94,4 +91,7 @@ if __name__ == "__main__":
     config = read_config(current_dir)
     args = load_args(config, current_dir)
 
-    curses.wrapper(start, args.host, args.port)
+    try:
+        curses.wrapper(start, args.host, args.port)
+    except ConnectionRefusedError:
+        print("Cannot connect to server, make sure it is running")
