@@ -66,7 +66,7 @@ The client should open a simple UI where you can register, login, and store and 
 - [ ] Implement proper session handling
 - [ ] Make input fields work with longer strings
 - [ ] Make vault and service lists scrollable
-- [ ] Add server backup and restore functionality
+- [x] Add server backup and restore functionality
 
 ## How it works
 ```mermaid
