@@ -1,5 +1,4 @@
 import curses
-from curses import textpad
 import pyperclip
 import re
 from . import client
@@ -92,6 +91,105 @@ class Console:
             self.running = False
 
 
+class InputBox:
+    def __init__(self, widget, loc, secret=False, init_str="", prompt=""):
+        self.widget = widget
+        self.prompt = prompt
+        self.secret = secret
+        self.loc = loc
+        self.text = init_str
+        self.view_loc = (
+            0, 0,
+            self.loc[0] + self.widget.loc[0],
+            self.loc[1] + self.widget.loc[1] + len(prompt),
+            self.loc[0] + self.widget.loc[0] + 1,
+            self.loc[1] + self.widget.loc[1] + widget.size[1] - 1
+        )
+        self.running = False
+        self.text_field = curses.newpad(1, 999)
+        self.text_field.keypad(True)
+
+    def _do_action(self, key):
+        curs_pos = self.text_field.getyx()
+        match key:
+            case 27:
+                self.widget.running = False
+                self.running = False
+            case 10:
+                self.running = False
+            case curses.KEY_BACKSPACE:
+                if curs_pos[1] > 0:
+                    self.text = self.text[:-1]
+                    self.text_field.delch(curs_pos[0], curs_pos[1] - 1)
+                if self.view_loc[1] > 0:
+                    self.view_loc = (
+                        self.view_loc[0], self.view_loc[1] - 1,
+                        self.view_loc[2], self.view_loc[3],
+                        self.view_loc[4], self.view_loc[5]
+                    )
+            case curses.KEY_LEFT:
+                if curs_pos[1] > 0:
+                    self.text_field.move(curs_pos[0], curs_pos[1] - 1)
+                if self.view_loc[1] > 0:
+                    self.view_loc = (
+                        self.view_loc[0], self.view_loc[1] - 1,
+                        self.view_loc[2], self.view_loc[3],
+                        self.view_loc[4], self.view_loc[5]
+                    )
+            case curses.KEY_RIGHT:
+                if curs_pos[1] < len(self.text):
+                    self.text_field.move(curs_pos[0], curs_pos[1] + 1)
+                if (
+                    curs_pos[1] > (self.widget.size[1] - len(self.prompt) - 2)
+                    and curs_pos[1] < len(self.text)
+                ):
+                    self.view_loc = (
+                        self.view_loc[0], self.view_loc[1] + 1,
+                        self.view_loc[2], self.view_loc[3],
+                        self.view_loc[4], self.view_loc[5]
+                    )
+            case _:
+                try:
+                    self.text += chr(key)
+                    self.text_field.insch(key)
+                    self.text_field.move(curs_pos[0], curs_pos[1] + 1)
+                    if curs_pos[1] > (
+                        self.widget.size[1] - len(self.prompt) - 2
+                    ):
+                        self.view_loc = (
+                            self.view_loc[0], self.view_loc[1] + 1,
+                            self.view_loc[2], self.view_loc[3],
+                            self.view_loc[4], self.view_loc[5]
+                        )
+                except ValueError:
+                    pass
+
+    def edit(self):
+        self.running = True
+        curses.curs_set(1)
+        self.text_field.move(0, len(self.text))
+        while self.running:
+            self.text_field.refresh(*self.view_loc)
+            key = self.text_field.getch()
+            self._do_action(key)
+        curses.curs_set(0)
+        return self.gather()
+
+    def gather(self):
+        return self.text.strip()
+
+    def draw(self):
+        self.widget.widget.addstr(*self.loc, self.prompt)
+        self.text_field.addstr(0, 0, self.text)
+        self.text_field.refresh(*self.view_loc)
+        self.widget.widget.refresh()
+
+    def clear(self):
+        self.text = ""
+        self.text_field.erase()
+        self.text_field.refresh(*self.view_loc)
+
+
 class MessageBox:
     def __init__(self, console):
         self.console = console
@@ -111,13 +209,9 @@ class MessageBox:
         self.msgbox.keypad(True)
         self.title = "Messages"
         self.error_color = self.console.error_color
-        self.search_prompt = "Search: "
-        self.search_field = self.msgbox.subpad(
-            0, self.size[1] - len(self.search_prompt),
-            self.loc[0], self.loc[1] + len(self.search_prompt)
+        self.search_box = InputBox(
+            self, (0, 0), prompt="Search: "
         )
-        self.search_field.keypad(True)
-        self.search_box = textpad.Textbox(self.search_field, insert_mode=True)
         self.query = None
 
     def draw_box(self):
@@ -182,7 +276,7 @@ class MessageBox:
             self.search_field.addstr(0, 0, self.query)
         self.search_field.refresh()
         curses.curs_set(1)
-        self.search_box.edit(self.search_validate).strip()
+        self.search_box.edit().strip()
         curses.curs_set(0)
         if self.query is None:
             self.search_field.erase()
@@ -654,56 +748,6 @@ class SettingsWindow(Window):
             await self.console.delete_account.run()
 
 
-class InputForm:
-    def __init__(
-        self, widget, prompt, pos, init_str="", secret=False, height=1
-    ):
-        self.widget = widget
-        self.widget_window = widget.widget
-        self.widget_size = self.widget_window.getmaxyx()
-        self.prompt = prompt
-        self.init_str = init_str
-        self.height = height
-        self.secret = secret
-        self.pos = pos
-        loc = self.widget_window.getbegyx()
-        self.input_field = self.widget_window.subpad(
-            self.height, self.widget_size[1] - len(self.prompt),
-            loc[0] + self.pos[0], loc[1] + self.pos[1] + len(self.prompt)
-        )
-        self.textbox = textpad.Textbox(self.input_field, insert_mode=True)
-        self.background_color = curses.color_pair(1)
-
-    def draw(self):
-        self.widget_window.addstr(self.pos[0], self.pos[1], self.prompt)
-        if self.secret:
-            self.input_field.attron(self.background_color)
-        self.input_field.addstr(0, 0, self.init_str)
-        self.input_field.refresh()
-
-    def validate(self, key):
-        if key == 27:
-            self.running = False
-            self.widget.running = False
-            self.widget.clear()
-            return 7
-        if key == 10:
-            return 7
-        return key
-
-    def get_input(self):
-        if len(self.init_str) > 0:
-            self.input_field.move(0, len(self.init_str))
-        else:
-            self.input_field.move(0, 0)
-        curses.curs_set(1)
-        out = self.textbox.edit(self.validate)
-        curses.curs_set(0)
-        if not self.widget.running:
-            return None
-        return out.strip()
-
-
 class Widget:
     def __init__(self, console, title):
         self.console = console
@@ -742,8 +786,7 @@ class Widget:
         self.box.refresh()
         if self.text_fields is not None:
             for text_field in self.text_fields:
-                text_field.input_field.erase()
-                text_field.input_field.refresh()
+                text_field.clear()
         self.widget.erase()
         self.widget.refresh()
 
@@ -752,16 +795,16 @@ class LoginWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Login")
         self.console = console
-        self.email_form = InputForm(self, "Email: ", (0, 0))
-        self.mpass_form = InputForm(
-            self, "Master password: ", (1, 0), secret=True
+        self.email_form = InputBox(self, (0, 0), prompt="Email: ")
+        self.mpass_form = InputBox(
+            self, (1, 0), prompt="Master password: ", secret=True
         )
         self.text_fields = [self.email_form, self.mpass_form]
 
     async def run(self):
         self.running = True
         self.draw()
-        email = self.email_form.get_input()
+        email = self.email_form.edit()
         if email is None:
             self.clear()
             return None
@@ -769,7 +812,7 @@ class LoginWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return None
-        mpass = self.mpass_form.get_input()
+        mpass = self.mpass_form.edit()
         if mpass is None:
             self.clear()
             return None
@@ -790,12 +833,12 @@ class LoginWidget(Widget):
 class RegisterWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Register")
-        self.email_form = InputForm(self, "Email: ", (0, 0))
-        self.mpass_form = InputForm(
-            self, "Master password: ", (1, 0), secret=True
+        self.email_form = InputBox(self, (0, 0), prompt="Email: ")
+        self.mpass_form = InputBox(
+            self, (1, 0), prompt="Master password: ", secret=True
         )
-        self.repeat_mpass_form = InputForm(
-            self, "Repeat master password: ", (2, 0), secret=True
+        self.repeat_mpass_form = InputBox(
+            self, (2, 0), prompt="Repeat master password: ", secret=True
         )
         self.text_fields = [
             self.email_form, self.mpass_form, self.repeat_mpass_form
@@ -804,7 +847,7 @@ class RegisterWidget(Widget):
     async def run(self):
         self.running = True
         self.draw()
-        email = self.email_form.get_input()
+        email = self.email_form.edit()
         if email is None:
             self.clear()
             return
@@ -812,7 +855,7 @@ class RegisterWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        mpass = self.mpass_form.get_input()
+        mpass = self.mpass_form.edit()
         if mpass is None:
             self.clear()
             return
@@ -820,7 +863,7 @@ class RegisterWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        repeat_mpass = self.repeat_mpass_form.get_input()
+        repeat_mpass = self.repeat_mpass_form.edit()
         if repeat_mpass is None:
             self.clear()
             return
@@ -839,15 +882,15 @@ class RegisterWidget(Widget):
 class DeleteAccountWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Delete account")
-        self.mpass_form = InputForm(
-            self, "Master password: ", (0, 0), secret=True
+        self.mpass_form = InputBox(
+            self, (0, 0), prompt="Master password: ", secret=True
         )
         self.text_fields = [self.mpass_form]
 
     async def run(self):
         self.running = True
         self.draw()
-        mpass = self.mpass_form.get_input()
+        mpass = self.mpass_form.edit()
         if mpass is None:
             self.clear()
             return
@@ -876,16 +919,16 @@ class DeleteAccountWidget(Widget):
 class ChangeEmailWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Change email")
-        self.email_form = InputForm(self, "New Email: ", (0, 0))
-        self.mpass_form = InputForm(
-            self, "Master password: ", (1, 0), secret=True
+        self.email_form = InputBox(self, (0, 0), prompt="New email: ")
+        self.mpass_form = InputBox(
+            self, (1, 0), prompt="Master password: ", secret=True
         )
         self.text_fields = [self.email_form, self.mpass_form]
 
     async def run(self):
         self.running = True
         self.draw()
-        new_email = self.email_form.get_input()
+        new_email = self.email_form.edit()
         if new_email is None:
             self.clear()
             return
@@ -893,7 +936,7 @@ class ChangeEmailWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        mpass = self.mpass_form.get_input()
+        mpass = self.mpass_form.edit()
         if mpass is None:
             self.clear()
             return
@@ -917,15 +960,14 @@ class ChangeEmailWidget(Widget):
 class ChangeMpassWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Change master password")
-        self.old_mpass_form = InputForm(
-            self, "Old master password: ", (0, 0), secret=True
+        self.old_mpass_form = InputBox(
+            self, (0, 0), prompt="Old master password: ", secret=True
         )
-        self.new_mpass_form = InputForm(
-            self, "New master password: ", (1, 0), secret=True
+        self.new_mpass_form = InputBox(
+            self, (1, 0), prompt="New master password: ", secret=True
         )
-        self.repeat_new_mpass_form = InputForm(
-            self, "Repeat new master password:",
-            (2, 0), secret=True
+        self.repeat_new_mpass_form = InputBox(
+            self, (2, 0), prompt="Repeat new master password: ", secret=True
         )
         self.text_fields = [
             self.old_mpass_form, self.new_mpass_form,
@@ -935,7 +977,7 @@ class ChangeMpassWidget(Widget):
     async def run(self):
         self.running = True
         self.draw()
-        old_mpass = self.old_mpass_form.get_input()
+        old_mpass = self.old_mpass_form.edit()
         if old_mpass is None:
             self.clear()
             return
@@ -943,7 +985,7 @@ class ChangeMpassWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        new_mpass = self.new_mpass_form.get_input()
+        new_mpass = self.new_mpass_form.edit()
         if new_mpass is None:
             self.clear()
             return
@@ -951,7 +993,7 @@ class ChangeMpassWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        repeat_new_mpass = self.repeat_new_mpass_form.get_input()
+        repeat_new_mpass = self.repeat_new_mpass_form.edit()
         if repeat_new_mpass is None:
             self.clear()
             return
@@ -975,13 +1017,13 @@ class ChangeMpassWidget(Widget):
 class AddVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Add vault")
-        self.vault_name_form = InputForm(self, "Vault name: ", (0, 0))
+        self.vault_name_form = InputBox(self, (0, 0), prompt="Vault name: ")
         self.text_fields = [self.vault_name_form]
 
     async def run(self):
         self.running = True
         self.draw()
-        vault_name = self.vault_name_form.get_input()
+        vault_name = self.vault_name_form.edit()
         if vault_name is None:
             self.clear()
             return
@@ -1001,14 +1043,15 @@ class AddVaultWidget(Widget):
 class RenameVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Rename vault")
-        self.vault_name_form = InputForm(
-            self, "New vault name: ", (0, 0))
+        self.vault_name_form = InputBox(
+            self, (0, 0), prompt="New vault name: "
+        )
         self.text_fields = [self.vault_name_form]
 
     async def run(self, vault_name):
         self.running = True
         self.draw()
-        new_vault_name = self.vault_name_form.get_input()
+        new_vault_name = self.vault_name_form.edit()
         if new_vault_name is None:
             self.clear()
             return
@@ -1028,10 +1071,12 @@ class RenameVaultWidget(Widget):
 class AddServiceWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Add service")
-        self.service_form = InputForm(self, "Service: ", (0, 0))
-        self.username_form = InputForm(self, "Username: ", (1, 0))
-        self.password_form = InputForm(self, "Password: ", (2, 0))
-        self.notes_form = InputForm(self, "Notes: ", (3, 0))
+        self.service_form = InputBox(self, (0, 0), prompt="Service: ")
+        self.username_form = InputBox(self, (1, 0), prompt="Username: ")
+        self.password_form = InputBox(
+            self, (2, 0), prompt="Password: ", secret=True
+        )
+        self.notes_form = InputBox(self, (3, 0), prompt="Notes: ")
         self.text_fields = [
             self.service_form, self.username_form,
             self.password_form, self.notes_form
@@ -1041,7 +1086,7 @@ class AddServiceWidget(Widget):
         self.running = True
         self.password_form.init_str = generate_password()
         self.draw()
-        service_name = self.service_form.get_input()
+        service_name = self.service_form.edit()
         if service_name is None:
             self.clear()
             return
@@ -1049,15 +1094,15 @@ class AddServiceWidget(Widget):
             self.console.msgbox.error("Service name cannot be empty")
             self.clear()
             return
-        username = self.username_form.get_input()
+        username = self.username_form.edit()
         if username is None:
             self.clear()
             return
-        password = self.password_form.get_input()
+        password = self.password_form.edit()
         if password is None:
             self.clear()
             return
-        notes = self.notes_form.get_input()
+        notes = self.notes_form.edit()
         if notes is None:
             self.clear()
             return
@@ -1073,17 +1118,17 @@ class EditServiceWidget(Widget):
         super().__init__(console, "Edit service")
 
     def run(self, service):
-        self.service_form = InputForm(
-            self, "Service: ", (0, 0), init_str=service["service"]
+        self.service_form = InputBox(
+            self, (0, 0), prompt="Service: ", init_str=service["service"]
         )
-        self.username_form = InputForm(
-            self, "Username: ", (1, 0), init_str=service["user"]
+        self.username_form = InputBox(
+            self, (1, 0), prompt="Username: ", init_str=service["user"]
         )
-        self.password_form = InputForm(
-            self, "Password: ", (2, 0), init_str=service["password"],
+        self.password_form = InputBox(
+            self, (2, 0), prompt="Password: ", secret=True,
         )
-        self.notes_form = InputForm(
-            self, "Notes: ", (3, 0), init_str=service["notes"]
+        self.notes_form = InputBox(
+            self, (3, 0), prompt="Notes: ", init_str=service["notes"]
         )
         self.text_fields = [
             self.service_form, self.username_form,
@@ -1091,7 +1136,7 @@ class EditServiceWidget(Widget):
         ]
         self.running = True
         self.draw()
-        service_name = self.service_form.get_input()
+        service_name = self.service_form.edit()
         if service_name is None:
             self.clear()
             return
@@ -1099,15 +1144,15 @@ class EditServiceWidget(Widget):
             self.console.msgbox.error("Service name cannot be empty")
             self.clear()
             return
-        username = self.username_form.get_input()
+        username = self.username_form.edit()
         if username is None:
             self.clear()
             return
-        password = self.password_form.get_input()
+        password = self.password_form.edit()
         if password is None:
             self.clear()
             return
-        notes = self.notes_form.get_input()
+        notes = self.notes_form.edit()
         if notes is None:
             self.clear()
             return
