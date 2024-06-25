@@ -91,6 +91,7 @@ class Console:
             self.running = False
 
 
+# TODO: Make inserting characters work properly
 class InputBox:
     def __init__(self, widget, loc, secret=False, init_str="", prompt=""):
         self.widget = widget
@@ -183,9 +184,10 @@ class InputBox:
     def gather(self):
         return self.text.strip()
 
-    def draw(self):
+    def draw_prompt(self):
         self.widget.widget.addstr(*self.loc, self.prompt)
-        self.widget.widget.refresh()
+
+    def draw(self):
         self.text_field.addstr(0, 0, self.text)
         self.text_field.refresh(*self.view_loc)
 
@@ -776,6 +778,9 @@ class Widget:
 
     def draw(self):
         self.draw_box()
+        if self.input_boxes is not None:
+            for input_box in self.input_boxes:
+                input_box.draw_prompt()
         self.widget.refresh()
         if self.input_boxes is not None:
             for input_box in self.input_boxes:
