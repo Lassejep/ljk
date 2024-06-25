@@ -110,6 +110,7 @@ class InputBox:
         self.text_field = curses.newpad(1, 999)
         self.text_field.keypad(True)
         self.secret_color = self.widget.console.background_color
+        self.func = None
 
     def _do_action(self, key):
         curs_pos = self.text_field.getyx()
@@ -169,7 +170,7 @@ class InputBox:
                         )
                 except ValueError:
                     pass
-        return None
+        return self.gather()
 
     def edit(self):
         self.running = True
@@ -178,6 +179,8 @@ class InputBox:
             self.text_field.refresh(*self.view_loc)
             key = self.text_field.getch()
             out = self._do_action(key)
+            if self.func is not None:
+                self.func(out)
         curses.curs_set(0)
         return out
 
@@ -207,13 +210,13 @@ class MessageBox:
             self.console.screen_size[1] - self.size[1]
         )
         self.loc = self.box.getbegyx()
-        self.msgbox = self.box.subpad(
+        self.widget = self.box.subpad(
             self.size[0] - 2, self.size[1] - 2,
             self.loc[0] + 1, self.loc[1] + 1
         )
-        self.size = self.msgbox.getmaxyx()
-        self.loc = self.msgbox.getbegyx()
-        self.msgbox.keypad(True)
+        self.size = self.widget.getmaxyx()
+        self.loc = self.widget.getbegyx()
+        self.widget.keypad(True)
         self.title = "Messages"
         self.error_color = self.console.error_color
         self.search_box = InputBox(
@@ -228,69 +231,44 @@ class MessageBox:
         self.box.refresh()
 
     def info(self, message):
-        self.msgbox.erase()
+        self.widget.erase()
         self.draw_box()
-        self.msgbox.addstr(0, 0, f"INFO: {message}")
-        self.msgbox.refresh()
+        self.widget.addstr(0, 0, f"INFO: {message}")
+        self.widget.refresh()
 
     def error(self, message):
-        self.msgbox.erase()
+        self.widget.erase()
         self.draw_box()
-        self.msgbox.addstr(0, 0, f"ERROR: {message}", self.error_color)
-        self.msgbox.refresh()
+        self.widget.addstr(0, 0, f"ERROR: {message}", self.error_color)
+        self.widget.refresh()
 
     def confirm(self, message):
-        self.msgbox.erase()
+        self.widget.erase()
         self.draw_box()
-        self.msgbox.addstr(0, 0, f"CONFIRM: {message} [y/N]")
-        self.msgbox.refresh()
-        if self.msgbox.getkey().lower() == "y":
+        self.widget.addstr(0, 0, f"CONFIRM: {message} [y/N]")
+        self.widget.refresh()
+        if self.widget.getkey().lower() == "y":
             return True
         return False
 
     def clear(self):
         self.box.erase()
         self.box.refresh()
-        self.msgbox.erase()
-        self.msgbox.refresh()
-
-    def search_validate(self, key):
-        if key == 27:
-            self.query = None
-            self.console.services_window.update_service_list()
-            return 7
-        if key > 32 or key < 126:
-            self.query = self.search_box.gather().strip() + chr(key)
-            self.console.services_window.update_service_list()
-        if key == 8:
-            self.query = self.search_box.gather().strip()
-            self.console.services_window.update_service_list()
-        if key == 263:
-            self.query = self.search_box.gather().strip()[:-1]
-            self.console.services_window.update_service_list()
-        if key == 10:
-            self.query = self.search_box.gather().strip()
-            self.console.services_window.update_service_list()
-            return 7
-        return key
+        self.widget.erase()
+        self.widget.refresh()
 
     def search(self):
-        self.msgbox.erase()
+        self.search_box.func = self.console.services_window.update_service_list
+        self.widget.erase()
         self.draw_box()
-        self.msgbox.addstr(0, 0, self.search_prompt)
-        self.msgbox.refresh()
-        if self.query is not None:
-            self.search_field.addstr(0, 0, self.query)
-        self.search_field.refresh()
-        curses.curs_set(1)
-        self.search_box.edit().strip()
-        curses.curs_set(0)
+        self.search_box.draw_prompt()
+        self.widget.refresh()
+        self.search_box.draw()
+        self.query = self.search_box.edit()
         if self.query is None:
-            self.search_field.erase()
-            self.search_field.move(0, 0)
-            self.search_field.refresh()
-            self.msgbox.erase()
-        self.msgbox.refresh()
+            self.search_box.clear()
+            return None
+        return self.query
 
 
 class Menu:
@@ -565,10 +543,9 @@ class ServiceWindow(Window):
         if self.console.escape(key):
             if self.console.msgbox.query is not None:
                 self.console.msgbox.query = None
-                self.console.msgbox.msgbox.erase()
-                self.console.msgbox.msgbox.refresh()
-                self.console.msgbox.search_field.erase()
-                self.console.msgbox.search_field.move(0, 0)
+                self.console.msgbox.search_box.clear()
+                self.console.msgbox.widget.erase()
+                self.console.msgbox.widget.refresh()
                 self.update_service_list()
             else:
                 self.running = False
@@ -603,17 +580,16 @@ class ServiceWindow(Window):
                 self.copy_password()
         self.draw()
 
-    def update_service_list(self):
+    def update_service_list(self, query=None):
         if self.console.vault is None:
             self.options = None
             return
         self.service_list = self.console.vault.services()
-        if self.console.msgbox.query is not None:
+        if query is not None:
             self.service_list = [
                 service for service in self.service_list
                 if re.search(
-                    self.console.msgbox.query, service["service"],
-                    re.IGNORECASE
+                    query, service["service"], re.IGNORECASE
                 ) is not None
             ]
             if self.service_list == 0:
@@ -1094,7 +1070,7 @@ class AddServiceWidget(Widget):
 
     def run(self):
         self.running = True
-        self.password_form.init_str = generate_password()
+        self.password_form.text = generate_password()
         self.draw()
         service_name = self.service_form.edit()
         if service_name is None:
