@@ -20,11 +20,12 @@ cd ljk
 pip install -r requirements.txt
 python -m unittest
 ```
-If you are having trouble with the `cryptography` package, try running the following command.
+Make sure all tests pass before running the server and client.
+
+If you are having trouble with the `cryptography` package, try running the following command:
 ```bash
 sudo apt-get install build-essential libssl-dev libffi-dev python3-dev cargo pkg-config
 ```
-Make sure all tests pass before running the server and client.
 
 ## Setup
 ### SSL
@@ -47,26 +48,35 @@ If you still have trouble with SSL, try adding the following line to the end of 
 ```
 
 ### Server
-Run the server on a machine that you want to store your user database on.
+Run the server on a machine that you want to store your user database on and connect to from the client.
 ```bash
-python server.py -H <host> -p <port> -d <database name> -l <log directory> -s <path to ssl certificate>
+python server.py
 ```
+This will generate a `server.conf` file where you can configure the server.
+It will also start the server on the default host and port, which you can change in the `server.conf` file.
 
 ### Client
 Run the client on a machine that you want to access your user database from.
 ```bash
-python client.py -H <host> -p <port>
+python client.py
 ```
-The client should open a simple UI where you can register, login, and store and retrieve passwords.
+First time you run the client a `client.conf` file will be generated where you can configure the client.
+It will also try to connect to the server on the default host and port, which you can change in the `client.conf` file.
 
-## To Do
-- [ ] Make the client work with small screens
-- [x] Add configuration file for the client
-- [x] Add configuration file for the server
-- [ ] Implement proper session handling
-- [ ] Make input fields work with longer strings
-- [ ] Make vault and service lists scrollable
-- [x] Add server backup and restore functionality
+Once you have the client and server running, you can register a new user, login, and store and retrieve passwords.
+
+## Planned Features
+### High Priority
+- [ ] GPG integration
+- [ ] Expanded password generation options
+- [ ] UI improvements
+- [ ] File encryption and storage
+- [ ] Better error handling
+
+### Low Priority
+- [ ] Better windows support
+- [ ] Mobile app
+- [ ] Browser extension
 
 ## How it works
 ```mermaid

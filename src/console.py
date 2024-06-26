@@ -10,6 +10,8 @@ class Console:
         self.ws = ws
         self.screen = screen
         self.screen_size = screen.getmaxyx()
+        if self.screen_size[0] < 24 or self.screen_size[1] < 80:
+            raise ValueError("Screen size too small (24x80 required)")
         self.running = False
         curses.set_escdelay(10)
         curses.curs_set(0)
@@ -1171,7 +1173,7 @@ class ShowServiceWidget(Widget):
         self.widget.addstr(1, 0, f"Username: {service['user']}")
         self.widget.addstr(2, 0, f"Password: {service['password']}")
         self.widget.addstr(3, 0, f"Notes: {service['notes']}")
-        self.widget.addstr(8, 0, "Press any key to close")
+        self.widget.addstr(5, 0, "Press any key to close")
         self.widget.getkey()
         self.clear()
 
