@@ -91,7 +91,6 @@ class Console:
             self.running = False
 
 
-# TODO: Make inserting characters work properly
 class InputBox:
     def __init__(self, widget, loc, secret=False, init_str="", prompt=""):
         self.widget = widget
@@ -123,7 +122,11 @@ class InputBox:
                 return self.gather()
             case curses.KEY_BACKSPACE:
                 if curs_pos[1] > 0:
-                    self.text = self.text[:-1]
+                    if curs_pos[1] < len(self.text):
+                        self.text = self.text[:curs_pos[1] - 1] + \
+                            self.text[curs_pos[1]:]
+                    else:
+                        self.text = self.text[:-1]
                     self.text_field.delch(curs_pos[0], curs_pos[1] - 1)
                 if self.view_loc[1] > 0:
                     self.view_loc = (
@@ -154,7 +157,11 @@ class InputBox:
                     )
             case _:
                 try:
-                    self.text += chr(key)
+                    if curs_pos[1] < len(self.text):
+                        self.text = self.text[:curs_pos[1]] + \
+                            chr(key) + self.text[curs_pos[1]:]
+                    else:
+                        self.text += chr(key)
                     if self.secret:
                         self.text_field.insch("*")
                     else:
@@ -439,7 +446,9 @@ class Window:
         for i, line in enumerate(linelist):
             x_offset = 0
             for j, keybind in enumerate(line):
-                keybind = padding[i] + keybind + padding[i] + "|"
+                keybind = padding[i] + keybind + padding[i]
+                if j != len(line) - 1:
+                    keybind += "|"
                 self.window.addstr(
                     i, x_offset, keybind
                 )
@@ -466,6 +475,8 @@ class Window:
     def draw_cols(self, window, y_offset, x_offset, option, selected):
         length = self.size[1] // len(option)
         for i, col in enumerate(option):
+            if len(col) > length - 2:
+                col = col[:length - 5] + "..."
             if selected:
                 window.addstr(
                     y_offset, x_offset + 1, col, self.console.hl_color
