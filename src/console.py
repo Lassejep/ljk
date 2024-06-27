@@ -159,6 +159,8 @@ class InputBox:
                     )
             case _:
                 try:
+                    if key < 32 or key > 126:
+                        raise ValueError
                     if curs_pos[1] < len(self.text):
                         self.text = self.text[:curs_pos[1]] + \
                             chr(key) + self.text[curs_pos[1]:]
@@ -178,7 +180,7 @@ class InputBox:
                             self.view_loc[4], self.view_loc[5]
                         )
                 except ValueError:
-                    pass
+                    return self.gather()
         return self.gather()
 
     def edit(self):
@@ -1168,13 +1170,16 @@ class ShowServiceWidget(Widget):
 
     def run(self, service):
         self.running = True
-        self.draw_box()
-        self.widget.addstr(0, 0, f"Service: {service['service']}")
-        self.widget.addstr(1, 0, f"Username: {service['user']}")
-        self.widget.addstr(2, 0, f"Password: {service['password']}")
-        self.widget.addstr(3, 0, f"Notes: {service['notes']}")
-        self.widget.addstr(5, 0, "Press any key to close")
-        self.widget.getkey()
+        while self.running:
+            self.clear()
+            self.draw_box()
+            self.widget.addstr(0, 0, f"Service: {service['service']}")
+            self.widget.addstr(1, 0, f"Username: {service['user']}")
+            self.widget.addstr(2, 0, f"Password: {service['password']}")
+            self.widget.addstr(3, 0, f"Notes: {service['notes']}")
+            self.widget.addstr(5, 0, "Press any key to close")
+            self.widget.getkey()
+            self.running = False
         self.clear()
 
 
