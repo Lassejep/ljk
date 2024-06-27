@@ -769,6 +769,7 @@ class Widget:
 
     def draw(self):
         self.draw_box()
+        self.widget.erase()
         if self.input_boxes is not None:
             for input_box in self.input_boxes:
                 input_box.draw_prompt()
@@ -1170,16 +1171,14 @@ class ShowServiceWidget(Widget):
 
     def run(self, service):
         self.running = True
-        while self.running:
-            self.clear()
-            self.draw_box()
-            self.widget.addstr(0, 0, f"Service: {service['service']}")
-            self.widget.addstr(1, 0, f"Username: {service['user']}")
-            self.widget.addstr(2, 0, f"Password: {service['password']}")
-            self.widget.addstr(3, 0, f"Notes: {service['notes']}")
-            self.widget.addstr(5, 0, "Press any key to close")
-            self.widget.getkey()
-            self.running = False
+        self.clear()
+        self.draw_box()
+        self.widget.addstr(0, 0, f"Service: {service['service']}")
+        self.widget.addstr(1, 0, f"Username: {service['user']}")
+        self.widget.addstr(2, 0, f"Password: {service['password']}")
+        self.widget.addstr(3, 0, f"Notes: {service['notes']}")
+        self.widget.addstr(5, 0, "Press any key to close")
+        self.widget.getkey()
         self.clear()
 
 
