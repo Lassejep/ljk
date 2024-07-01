@@ -4,20 +4,23 @@ import websockets
 import logging
 import asyncio
 import server
-from src import encryption, client
+from src import encryption, client, db
 
 
 class TestClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.db_path = "test.db"
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        self.db = db.Database(self.db_path)
         logging.basicConfig(
             filename="test.log",
             level=logging.DEBUG,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        self.server = asyncio.create_task(server.main(db_path=self.db_path))
-        if os.path.exists(self.db_path):
-            os.remove(self.db_path)
+        self.server = asyncio.create_task(server.run_server(
+            "0.0.0.0", 8765, None, self.db
+        ))
         self.ws = await websockets.connect(
             "wss://localhost:8765", ssl=None, ping_interval=None
         )
