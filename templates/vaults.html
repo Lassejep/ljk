@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Vaults · {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="vault-header">
+    <h2>Your Vaults</h2>
+    <button class="btn btn-secondary" id="create-vault">New Vault</button>
+</div>
+
+<div class="vault-list">
+    <!-- Dynamic vault list from WS -->
+    <div class="vault-item skeleton"></div>
+    <div class="vault-item skeleton"></div>
+</div>
+{% endblock %}

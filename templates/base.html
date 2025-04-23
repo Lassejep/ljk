@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LJK Password Manager{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <a href="/">LJK Password Manager</a>
+        </div>
+        <div class="navbar-menu">
+            {% if user %}
+            <a href="/vaults" class="nav-item">Vaults</a>
+            <a href="/logout" class="nav-item">Logout</a>
+            {% else %}
+            <a href="/login" class="nav-item">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -21,3 +21,6 @@ backups/*
 *.key
 *.crt
 *.conf
+
+.vectorcode/
+codecompanion-workspace.json

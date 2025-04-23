@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Login · {{ super() }}{% endblock %}
+
+{% block content %}
+<form class="auth-form" id="login-form">
+    <h2>Master Login</h2>
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="mpass">Master Password</label>
+        <input type="password" id="mpass" name="mpass" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Unlock</button>
+</form>
+{% endblock %}
