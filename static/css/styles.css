@@ -19,128 +19,133 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 1rem 2rem;
     display: flex;
-    justify-content: space-between;
+        justify-content: space-between;
     align-items: center;
 }
+
 
 .navbar-brand a {
     font-weight: 600;
     color: var(--primary-color);
     text-decoration: none;
+    font-size: 1.2rem;
+}
+
+.navbar-menu {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-item {
+    color: var(--text-dark);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius);
+    transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.hero {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.05em;
+}
+
+.hero-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.hero-subtitle {
     font-size: 1.25rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
 }
 
-.auth-form {
-    max-width: 400px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background: white;
-    border-radius: var(--border-radius);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: var(--border-radius);
+.hero-cta {
+    margin-top: 2rem;
 }
 
 .btn {
-    padding: 0.5rem 1rem;
+    padding: 0.8rem 1.5rem;
     border: none;
     border-radius: var(--border-radius);
+    font-weight: 500;
     cursor: pointer;
-}
-
-.btn-primary {
-    background: var(--secondary-color);
-    color: white;
-}
-
-.btn-secondary {
-    background: var(--primary-color);
-    color: white;
-}
-
-.vault-list {
-    display: grid;
-    gap: 1rem;
-    padding: 2rem;
-}
-
-.vault-item {
-    background: white;
-    padding: 1rem;
-    border-radius: var(--border-radius);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Skeleton loading */
-.skeleton {
-    animation: skeleton-loading 1s linear infinite alternate;
-    height: 100px;
-    opacity: 0.7;
-}
-
-@keyframes skeleton-loading {
-    0% { background-color: hsl(200, 20%, 80%) }
-    100% { background-color: hsl(200, 20%, 95%) }
-}
-
-/* Service forms */
-.form-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: flex;
+    transition: all 0.2s ease;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.service-form {
-    background: white;
-    padding: 2rem;
-    border-radius: var(--border-radius);
-    width: 100%;
-    max-width: 500px;
-}
-
-.password-input {
-    display: flex;
     gap: 0.5rem;
 }
 
-.password-input input {
-    flex: 1;
+.btn-primary {
+    background: white;
+    color: var(--primary-color);
 }
 
-.icon-btn {
-    padding: 0.5rem;
-    min-width: auto;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-.form-actions {
-    display: flex;
-    gap: 1rem;
+.security-note {
     margin-top: 1rem;
-    justify-content: flex-end;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
 }
 
-/* Responsive design */
+.vault-preview {
+    margin-top: 3rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    max-width: 800px;
+    margin: 3rem auto 0;
+}
+
+.vault-item {
+    background: rgba(255,255,255,0.1);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.2s ease;
+}
+
+.vault-item:hover {
+    transform: translateY(-3px);
+    background: rgba(255,255,255,0.15);
+}
+
+.demo-item {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+
 @media (max-width: 768px) {
     .navbar {
         flex-direction: column;
