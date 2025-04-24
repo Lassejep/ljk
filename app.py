@@ -21,6 +21,14 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/register')
+def register():
+    """Account Registration"""
+    if 'user' in session:
+        return redirect(url_for('vaults'))
+    return render_template('register.html')
+
+
 @app.route('/login')
 def login():
     """Authentication gateway"""

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Register · {{ super() }}{% endblock %}
+
+{% block content %}
+<form class="auth-form" id="register-form">
+    <h2>Create Master Account</h2>
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required autocomplete="username">
+    </div>
+    <div class="form-group">
+        <label for="mpass">Master Password</label>
+        <input type="password" id="mpass" name="mpass" required autocomplete="new-password">
+    </div>
+    <div class="form-group">
+        <label for="mpass-confirm">Confirm Password</label>
+        <input type="password" id="mpass-confirm" required autocomplete="new-password">
+    </div>
+    <div class="form-footer">
+        <button type="submit" class="btn btn-primary">Create Account</button>
+        <p class="auth-alternate">
+            Existing user? <a href="/login">Login instead</a>
+        </p>
+    </div>
+</form>
+{% endblock %}
