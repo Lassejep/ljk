@@ -21,3 +21,4 @@ backups/*
 *.key
 *.crt
 *.conf
+.vectorcode
