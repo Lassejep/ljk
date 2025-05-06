@@ -10,7 +10,7 @@ from websockets.server import serve
 from websockets.exceptions import ConnectionClosedOK
 from datetime import datetime
 from os import path, mkdir
-from src import db, handlers
+from src.model import db, handlers
 import configparser
 
 

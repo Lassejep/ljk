@@ -1,6 +1,6 @@
 import pickle
-from . import encryption
-from .vault import Vault
+from src.model import encryption
+from src.model.vault import Vault
 
 
 async def register(websocket, email, mpass):

@@ -6,7 +6,7 @@ import curses
 import argparse
 import pathlib
 import configparser
-from src import console
+from src.view import console
 
 
 def create_config():

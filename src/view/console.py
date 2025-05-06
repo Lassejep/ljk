@@ -1,8 +1,8 @@
 import curses
 import pyperclip
 import re
-from . import client
-from .encryption import generate_password
+from src.presenter import client
+from src.model.encryption import generate_password
 
 
 class Console:
