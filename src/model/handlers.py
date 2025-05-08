@@ -1,5 +1,6 @@
-import pickle
 import logging
+import pickle
+
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
@@ -31,17 +32,11 @@ async def auth(ws, msg, database, rhost, rport):
         else:
             raise VerifyMismatchError
     except VerifyMismatchError:
-        logging.error(
-            f"{rhost}:{rport} invalid password for user:{uid}"
-        )
-        response = pickle.dumps(
-            {"status": "failed", "error": "Invalid password"}
-        )
+        logging.error(f"{rhost}:{rport} invalid password for user:{uid}")
+        response = pickle.dumps({"status": "failed", "error": "Invalid password"})
     except Exception as e:
         logging.error(f"Error: {e}")
-        response = pickle.dumps(
-            {"status": "failed", "error": str(e)}
-        )
+        response = pickle.dumps({"status": "failed", "error": str(e)})
     await ws.send(response)
 
 
@@ -65,9 +60,7 @@ async def change_auth_key(ws, msg, database, rhost, rport):
         new_auth_key = PasswordHasher().hash(msg["new_mkey"])
         database.update_auth_key(msg["uid"], new_auth_key)
         database.commit()
-        logging.info(
-            f"{rhost}:{rport} changed auth key for user:{msg['uid']}"
-        )
+        logging.info(f"{rhost}:{rport} changed auth key for user:{msg['uid']}")
         response = pickle.dumps({"status": "success"})
         await ws.send(response)
     except Exception as e:
@@ -93,9 +86,7 @@ async def get_vault(ws, msg, database, rhost, rport):
         vault = database.get_vault(msg["uid"], msg["vault_name"])
         response = pickle.dumps({"status": "success", "vault": vault})
         await ws.send(response)
-        logging.info(
-            f"{rhost}:{rport} received vault:{vault['id']}"
-        )
+        logging.info(f"{rhost}:{rport} received vault:{vault['id']}")
     except Exception as e:
         logging.error(f"Error: {e}")
         response = pickle.dumps({"status": "failed", "error": str(e)})
@@ -106,10 +97,7 @@ async def get_vault(ws, msg, database, rhost, rport):
 async def create_vault(ws, msg, database, rhost, rport):
     try:
         database.add_vault(
-            msg["uid"],
-            msg["vault_name"],
-            msg["vault_key"],
-            msg["vault_data"]
+            msg["uid"], msg["vault_name"], msg["vault_key"], msg["vault_data"]
         )
         vault_id = database.get_vault_id(msg["uid"], msg["vault_name"])
         logging.info(f"{rhost}:{rport} created vault:{vault_id}")
@@ -125,11 +113,7 @@ async def create_vault(ws, msg, database, rhost, rport):
 
 async def update_vault_key(ws, msg, database, rhost, rport):
     try:
-        database.update_vault_key(
-            msg["uid"],
-            msg["vault_name"],
-            msg["vault_key"]
-        )
+        database.update_vault_key(msg["uid"], msg["vault_name"], msg["vault_key"])
         database.commit()
         vault_id = database.get_vault_id(msg["uid"], msg["vault_name"])
         logging.info(f"{rhost}:{rport} updated vault key for vault:{vault_id}")
@@ -161,7 +145,8 @@ async def invalid_command(ws, msg, rhost, rport):
     response = pickle.dumps(
         {
             "status": "failed",
-            "error": f"{rhost}:{rport} sent invalid command {msg['command']}"}
+            "error": f"{rhost}:{rport} sent invalid command {msg['command']}",
+        }
     )
     await ws.send(response)
     await ws.close()
@@ -188,10 +173,7 @@ async def save_vault(ws, msg, database, rhost, rport):
 
 async def delete_account(ws, msg, database, rhost, rport):
     try:
-        if not PasswordHasher().verify(
-            database.get_auth_key(msg["uid"]),
-            msg["mkey"]
-        ):
+        if not PasswordHasher().verify(database.get_auth_key(msg["uid"]), msg["mkey"]):
             raise VerifyMismatchError
         database.delete_user(msg["uid"])
         database.commit()
@@ -199,12 +181,8 @@ async def delete_account(ws, msg, database, rhost, rport):
         response = pickle.dumps({"status": "success"})
         await ws.send(response)
     except VerifyMismatchError:
-        logging.error(
-            f"{rhost}:{rport} invalid password for user:{msg['uid']}"
-        )
-        response = pickle.dumps(
-            {"status": "failed", "error": "Invalid password"}
-        )
+        logging.error(f"{rhost}:{rport} invalid password for user:{msg['uid']}")
+        response = pickle.dumps({"status": "failed", "error": "Invalid password"})
         await ws.send(response)
     except Exception as e:
         logging.error(f"Error: {e}\nRolling back database")
@@ -215,15 +193,9 @@ async def delete_account(ws, msg, database, rhost, rport):
 
 async def update_vault_name(ws, msg, database, rhost, rport):
     try:
-        database.update_vault_name(
-            msg["uid"],
-            msg["vault_name"],
-            msg["new_vault_name"]
-        )
+        database.update_vault_name(msg["uid"], msg["vault_name"], msg["new_vault_name"])
         database.commit()
-        logging.info(
-            f"{rhost}:{rport} changed vault name for user:{msg['uid']}"
-        )
+        logging.info(f"{rhost}:{rport} changed vault name for user:{msg['uid']}")
         response = pickle.dumps({"status": "success"})
         await ws.send(response)
     except Exception as e:

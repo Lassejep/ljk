@@ -1,10 +1,12 @@
-import unittest
-import os
-import websockets
-import logging
 import asyncio
+import logging
+import os
+import unittest
+
+import websockets
+
 import server
-from src import encryption, client, db
+from src import client, db, encryption
 
 
 class TestClient(unittest.IsolatedAsyncioTestCase):
@@ -18,9 +20,9 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             level=logging.DEBUG,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        self.server = asyncio.create_task(server.run_server(
-            "0.0.0.0", 8765, None, self.db
-        ))
+        self.server = asyncio.create_task(
+            server.run_server("0.0.0.0", 8765, None, self.db)
+        )
         self.ws = await websockets.connect(
             "wss://localhost:8765", ssl=None, ping_interval=None
         )
@@ -55,9 +57,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await client.register(self.ws, self.email, self.mpass)
         user = await client.auth(self.ws, self.email, self.mpass)
         await client.create_vault(self.ws, user, self.vault_name)
-        vault = await client.get_vault(
-            self.ws, user, self.vault_name
-        )
+        vault = await client.get_vault(self.ws, user, self.vault_name)
         self.assertIsNotNone(vault)
         self.assertIsNotNone(vault.connection)
 
@@ -65,9 +65,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await client.register(self.ws, self.email, self.mpass)
         user = await client.auth(self.ws, self.email, self.mpass)
         await client.create_vault(self.ws, user, self.vault_name)
-        self.vault = await client.get_vault(
-            self.ws, user, self.vault_name
-        )
+        self.vault = await client.get_vault(self.ws, user, self.vault_name)
         self.vault.add(self.service, self.user, self.password, self.notes)
         save = await client.save_vault(self.ws, user, self.vault)
         self.assertTrue(save)
@@ -97,9 +95,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await client.register(self.ws, self.email, self.mpass)
         user = await client.auth(self.ws, self.email, self.mpass)
         await client.create_vault(self.ws, user, self.vault_name)
-        self.vault = await client.get_vault(
-            self.ws, user, self.vault_name
-        )
+        self.vault = await client.get_vault(self.ws, user, self.vault_name)
         new_mpass = "new_master_pass"
         self.vault.add(self.service, self.user, self.password, self.notes)
         status = await client.change_mkey(self.ws, user, self.mpass, new_mpass)
@@ -114,9 +110,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         user = await client.auth(self.ws, self.email, self.mpass)
         await client.create_vault(self.ws, user, self.vault_name)
         new_email = "new_email"
-        status = await client.change_email(
-            self.ws, user, new_email, self.mpass
-        )
+        status = await client.change_email(self.ws, user, new_email, self.mpass)
         self.assertTrue(status)
         user = await client.auth(self.ws, new_email, self.mpass)
         self.assertIsNotNone(user)
@@ -135,9 +129,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         user = await client.auth(self.ws, self.email, self.mpass)
         await client.create_vault(self.ws, user, self.vault_name)
         new_vkey = encryption.generate_vault_key()
-        status = await client.update_vault_key(
-            self.ws, user, self.vault_name, new_vkey
-        )
+        status = await client.update_vault_key(self.ws, user, self.vault_name, new_vkey)
         self.assertTrue(status)
 
     async def asyncTearDown(self):

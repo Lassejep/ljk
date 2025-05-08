@@ -1,13 +1,13 @@
+from secrets import choice, randbits
+from string import ascii_letters, digits, punctuation
+
 import argon2
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from string import ascii_letters, digits, punctuation
-from secrets import choice, randbits
 
 
 def generate_password(password_length=16):
-    password = ''.join(
-        choice(ascii_letters + digits + punctuation)
-        for _ in range(password_length)
+    password = "".join(
+        choice(ascii_letters + digits + punctuation) for _ in range(password_length)
     )
     return password
 
@@ -33,11 +33,7 @@ def generate_vault_key():
 def create_mkey(password, dkey):
     salt = dkey
     kdf = argon2.PasswordHasher(
-        time_cost=16,
-        memory_cost=65536,
-        parallelism=8,
-        hash_len=32,
-        salt_len=32
+        time_cost=16, memory_cost=65536, parallelism=8, hash_len=32, salt_len=32
     )
     hash = kdf.hash(password, salt=salt)
     return hash[-32:].encode()
@@ -48,11 +44,7 @@ def create_dkey(password, username):
         raise ValueError("Username must be at least 8 characters long")
     salt = username.encode()
     kdf = argon2.PasswordHasher(
-        time_cost=16,
-        memory_cost=65536,
-        parallelism=8,
-        hash_len=32,
-        salt_len=len(salt)
+        time_cost=16, memory_cost=65536, parallelism=8, hash_len=32, salt_len=len(salt)
     )
     hash = kdf.hash(password, salt=salt)
     return hash[-32:].encode()

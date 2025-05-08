@@ -1,5 +1,6 @@
-import unittest
 import os
+import unittest
+
 from src import db
 
 
@@ -30,9 +31,7 @@ class TestDB(unittest.TestCase):
         self.assertIsNotNone(id2)
         self.assertEqual(user2["email"], "test_user_2")
         self.assertEqual(user2["auth_key"], "test_auth_key_2")
-        self.assertRaises(
-            Exception, self.db.add_user, "test_user_2", "test_auth_key"
-        )
+        self.assertRaises(Exception, self.db.add_user, "test_user_2", "test_auth_key")
         self.assertNotEqual(id, id2)
         self.assertNotEqual(user["email"], user2["email"])
         self.assertNotEqual(user["auth_key"], user2["auth_key"])
@@ -68,9 +67,7 @@ class TestDB(unittest.TestCase):
         user = self.db.get_user(id)
         self.assertEqual(user["auth_key"], "new_auth_key")
         self.assertNotEqual(user["auth_key"], self.user_auth_key)
-        self.assertRaises(
-            Exception, self.db.update_auth_key, 2, "new_auth_key"
-        )
+        self.assertRaises(Exception, self.db.update_auth_key, 2, "new_auth_key")
 
     def test_get_id(self):
         self.db.add_user(self.user_email, self.user_auth_key)
@@ -92,9 +89,7 @@ class TestDB(unittest.TestCase):
         vault = self.db.get_vault(id, "test_vault")
         self.assertIsNotNone(vault)
         self.assertEqual(vault["name"], "test_vault")
-        self.assertRaises(
-            Exception, self.db.add_vault, id, "test_vault"
-        )
+        self.assertRaises(Exception, self.db.add_vault, id, "test_vault")
 
     def test_delete_vault(self):
         self.db.add_user(self.user_email, self.user_auth_key)
@@ -126,9 +121,7 @@ class TestDB(unittest.TestCase):
         self.db.add_vault(id, "test_vault", "test_key", "test_data")
         data = self.db.get_vault_data(id, "test_vault")
         self.assertEqual(data, "test_data")
-        self.assertRaises(
-            Exception, self.db.get_vault_data, id, "test_vault_2"
-        )
+        self.assertRaises(Exception, self.db.get_vault_data, id, "test_vault_2")
 
     def test_get_vault_id(self):
         self.db.add_user(self.user_email, self.user_auth_key)
@@ -136,9 +129,7 @@ class TestDB(unittest.TestCase):
         self.db.add_vault(id, "test_vault", "test_key", "test_data")
         vault_id = self.db.get_vault_id(id, "test_vault")
         self.assertIsNotNone(vault_id)
-        self.assertRaises(
-            Exception, self.db.get_vault_id, id, "test_vault_2"
-        )
+        self.assertRaises(Exception, self.db.get_vault_id, id, "test_vault_2")
 
     def test_update_vault_name(self):
         self.db.add_user(self.user_email, self.user_auth_key)
@@ -149,8 +140,7 @@ class TestDB(unittest.TestCase):
         self.assertIsNotNone(vault)
         self.assertEqual(vault["name"], "new_vault")
         self.assertRaises(
-            Exception, self.db.update_vault_name, id,
-            "test_vault_2", "new_vault"
+            Exception, self.db.update_vault_name, id, "test_vault_2", "new_vault"
         )
 
     def test_update_vault_key(self):

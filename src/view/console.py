@@ -1,8 +1,10 @@
 import curses
-import pyperclip
 import re
-from src.presenter import client
+
+import pyperclip
+
 from src.model.encryption import generate_password
+from src.presenter import client
 
 
 class Console:
@@ -101,11 +103,12 @@ class InputBox:
         self.loc = loc
         self.text = init_str
         self.view_loc = (
-            0, 0,
+            0,
+            0,
             self.loc[0] + self.widget.loc[0],
             self.loc[1] + self.widget.loc[1] + len(prompt),
             self.loc[0] + self.widget.loc[0] + 1,
-            self.loc[1] + self.widget.loc[1] + widget.size[1] - 1
+            self.loc[1] + self.widget.loc[1] + widget.size[1] - 1,
         )
         self.running = False
         self.text_field = curses.newpad(1, 999)
@@ -125,45 +128,57 @@ class InputBox:
             case curses.KEY_BACKSPACE:
                 if curs_pos[1] > 0:
                     if curs_pos[1] < len(self.text):
-                        self.text = self.text[:curs_pos[1] - 1] + \
-                            self.text[curs_pos[1]:]
+                        self.text = (
+                            self.text[: curs_pos[1] - 1] + self.text[curs_pos[1] :]
+                        )
                     else:
                         self.text = self.text[:-1]
                     self.text_field.delch(curs_pos[0], curs_pos[1] - 1)
                 if self.view_loc[1] > 0:
                     self.view_loc = (
-                        self.view_loc[0], self.view_loc[1] - 1,
-                        self.view_loc[2], self.view_loc[3],
-                        self.view_loc[4], self.view_loc[5]
+                        self.view_loc[0],
+                        self.view_loc[1] - 1,
+                        self.view_loc[2],
+                        self.view_loc[3],
+                        self.view_loc[4],
+                        self.view_loc[5],
                     )
             case curses.KEY_LEFT:
                 if curs_pos[1] > 0:
                     self.text_field.move(curs_pos[0], curs_pos[1] - 1)
                 if self.view_loc[1] > 0:
                     self.view_loc = (
-                        self.view_loc[0], self.view_loc[1] - 1,
-                        self.view_loc[2], self.view_loc[3],
-                        self.view_loc[4], self.view_loc[5]
+                        self.view_loc[0],
+                        self.view_loc[1] - 1,
+                        self.view_loc[2],
+                        self.view_loc[3],
+                        self.view_loc[4],
+                        self.view_loc[5],
                     )
             case curses.KEY_RIGHT:
                 if curs_pos[1] < len(self.text):
                     self.text_field.move(curs_pos[0], curs_pos[1] + 1)
-                if (
-                    curs_pos[1] > (self.widget.size[1] - len(self.prompt) - 2)
-                    and curs_pos[1] < len(self.text)
-                ):
+                if curs_pos[1] > (
+                    self.widget.size[1] - len(self.prompt) - 2
+                ) and curs_pos[1] < len(self.text):
                     self.view_loc = (
-                        self.view_loc[0], self.view_loc[1] + 1,
-                        self.view_loc[2], self.view_loc[3],
-                        self.view_loc[4], self.view_loc[5]
+                        self.view_loc[0],
+                        self.view_loc[1] + 1,
+                        self.view_loc[2],
+                        self.view_loc[3],
+                        self.view_loc[4],
+                        self.view_loc[5],
                     )
             case _:
                 try:
                     if key < 32 or key > 126:
                         raise ValueError
                     if curs_pos[1] < len(self.text):
-                        self.text = self.text[:curs_pos[1]] + \
-                            chr(key) + self.text[curs_pos[1]:]
+                        self.text = (
+                            self.text[: curs_pos[1]]
+                            + chr(key)
+                            + self.text[curs_pos[1] :]
+                        )
                     else:
                         self.text += chr(key)
                     if self.secret:
@@ -171,13 +186,14 @@ class InputBox:
                     else:
                         self.text_field.insch(key)
                     self.text_field.move(curs_pos[0], curs_pos[1] + 1)
-                    if curs_pos[1] > (
-                        self.widget.size[1] - len(self.prompt) - 2
-                    ):
+                    if curs_pos[1] > (self.widget.size[1] - len(self.prompt) - 2):
                         self.view_loc = (
-                            self.view_loc[0], self.view_loc[1] + 1,
-                            self.view_loc[2], self.view_loc[3],
-                            self.view_loc[4], self.view_loc[5]
+                            self.view_loc[0],
+                            self.view_loc[1] + 1,
+                            self.view_loc[2],
+                            self.view_loc[3],
+                            self.view_loc[4],
+                            self.view_loc[5],
                         )
                 except ValueError:
                     return self.gather()
@@ -216,23 +232,21 @@ class MessageBox:
         self.console = console
         self.size = (3, self.console.screen_size[1] * 4 // 5)
         self.box = self.console.screen.subpad(
-            self.size[0], self.size[1],
+            self.size[0],
+            self.size[1],
             self.console.screen_size[0] - self.size[0],
-            self.console.screen_size[1] - self.size[1]
+            self.console.screen_size[1] - self.size[1],
         )
         self.loc = self.box.getbegyx()
         self.widget = self.box.subpad(
-            self.size[0] - 2, self.size[1] - 2,
-            self.loc[0] + 1, self.loc[1] + 1
+            self.size[0] - 2, self.size[1] - 2, self.loc[0] + 1, self.loc[1] + 1
         )
         self.size = self.widget.getmaxyx()
         self.loc = self.widget.getbegyx()
         self.widget.keypad(True)
         self.title = "Messages"
         self.error_color = self.console.error_color
-        self.search_box = InputBox(
-            self, (0, 0), prompt="Search: "
-        )
+        self.search_box = InputBox(self, (0, 0), prompt="Search: ")
         self.query = None
 
     def draw_box(self):
@@ -286,16 +300,11 @@ class Menu:
     def __init__(self, console, title):
         self.console = console
         self.title = title
-        self.box_size = (
-            self.console.screen_size[0], self.console.screen_size[1] // 5
-        )
-        self.box = self.console.screen.subpad(
-            self.box_size[0], self.box_size[1], 0, 0
-        )
+        self.box_size = (self.console.screen_size[0], self.console.screen_size[1] // 5)
+        self.box = self.console.screen.subpad(self.box_size[0], self.box_size[1], 0, 0)
         self.loc = self.box.getbegyx()
         self.menu = self.box.subpad(
-            self.box_size[0] - 2, self.box_size[1] - 2,
-            self.loc[0] + 1, self.loc[1] + 1
+            self.box_size[0] - 2, self.box_size[1] - 2, self.loc[0] + 1, self.loc[1] + 1
         )
         self.size = self.menu.getmaxyx()
         self.loc = self.menu.getbegyx()
@@ -318,9 +327,7 @@ class Menu:
             return
         for i, option in enumerate(self.options):
             if i == self.pos[0]:
-                self.menu.addstr(
-                    i, 1, option, self.console.hl_color
-                )
+                self.menu.addstr(i, 1, option, self.console.hl_color)
             else:
                 self.menu.addstr(i, 0, option)
 
@@ -364,7 +371,11 @@ class MainMenu(Menu):
     def __init__(self, console):
         super().__init__(console, title="Main Menu")
         self.options = [
-            "1. Services", "2. Vaults", "3. Settings", "4. Logout", "5. Exit"
+            "1. Services",
+            "2. Vaults",
+            "3. Settings",
+            "4. Logout",
+            "5. Exit",
         ]
 
     async def run(self):
@@ -410,16 +421,17 @@ class Window:
         self.title = title
         self.box_size = (
             self.console.screen_size[0] - 3,
-            self.console.screen_size[1] * 4 // 5
+            self.console.screen_size[1] * 4 // 5,
         )
         self.box = self.console.screen.subpad(
-            self.box_size[0], self.box_size[1],
-            0, self.console.screen_size[1] - self.box_size[1]
+            self.box_size[0],
+            self.box_size[1],
+            0,
+            self.console.screen_size[1] - self.box_size[1],
         )
         self.loc = self.box.getbegyx()
         self.window = self.box.subpad(
-            self.box_size[0] - 2, self.box_size[1] - 2,
-            self.loc[0] + 1, self.loc[1] + 1
+            self.box_size[0] - 2, self.box_size[1] - 2, self.loc[0] + 1, self.loc[1] + 1
         )
         self.size = self.window.getmaxyx()
         self.loc = self.window.getbegyx()
@@ -453,9 +465,7 @@ class Window:
                 keybind = padding[i] + keybind + padding[i]
                 if j != len(line) - 1:
                     keybind += "|"
-                self.window.addstr(
-                    i, x_offset, keybind
-                )
+                self.window.addstr(i, x_offset, keybind)
                 x_offset += len(keybind)
         self.window.hline(i + 1, 0, curses.ACS_HLINE, self.size[1])
 
@@ -472,27 +482,20 @@ class Window:
                     self.window.addstr(i + self.y_offset, 0, option)
             elif type(option) is tuple:
                 self.draw_cols(
-                    self.window, i + self.y_offset, 0,
-                    option, self.pos[0] == i
+                    self.window, i + self.y_offset, 0, option, self.pos[0] == i
                 )
 
     def draw_cols(self, window, y_offset, x_offset, option, selected):
         length = self.size[1] // len(option)
         for i, col in enumerate(option):
             if len(col) > length - 2:
-                col = col[:length - 5] + "..."
+                col = col[: length - 5] + "..."
             if selected:
-                window.addstr(
-                    y_offset, x_offset + 1, col, self.console.hl_color
-                )
-                window.vline(
-                    y_offset, x_offset + length - 1, curses.ACS_VLINE, 1
-                )
+                window.addstr(y_offset, x_offset + 1, col, self.console.hl_color)
+                window.vline(y_offset, x_offset + length - 1, curses.ACS_VLINE, 1)
             else:
                 window.addstr(y_offset, x_offset, col)
-                window.vline(
-                    y_offset, x_offset + length - 1, curses.ACS_VLINE, 1
-                )
+                window.vline(y_offset, x_offset + length - 1, curses.ACS_VLINE, 1)
             x_offset += length
 
     async def navigate(self):
@@ -537,9 +540,13 @@ class ServiceWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Services")
         self.keybinds = [
-            "<Y> Copy password", "<Enter> Show service",
-            "<A> Add service", "<D> Delete service",
-            "<E> Edit service", "</> Search", "<ESC> Main menu"
+            "<Y> Copy password",
+            "<Enter> Show service",
+            "<A> Add service",
+            "<D> Delete service",
+            "<E> Edit service",
+            "</> Search",
+            "<ESC> Main menu",
         ]
         self.service_list = None
 
@@ -602,10 +609,9 @@ class ServiceWindow(Window):
         self.service_list = self.console.vault.services()
         if query is not None:
             self.service_list = [
-                service for service in self.service_list
-                if re.search(
-                    query, service["service"], re.IGNORECASE
-                ) is not None
+                service
+                for service in self.service_list
+                if re.search(query, service["service"], re.IGNORECASE) is not None
             ]
             if self.service_list == 0:
                 self.options = None
@@ -641,8 +647,11 @@ class VaultWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Vaults")
         self.keybinds = [
-            "<Enter> Select vault", "<A> Add vault",
-            "<D> Delete vault", "<R> Rename vault", "<ESC> Main menu"
+            "<Enter> Select vault",
+            "<A> Add vault",
+            "<D> Delete vault",
+            "<R> Rename vault",
+            "<ESC> Main menu",
         ]
         self.options = None
         self.vault_list = None
@@ -679,9 +688,7 @@ class VaultWindow(Window):
         self.draw()
 
     async def update_vault_list(self):
-        self.vault_list = await client.get_vaults(
-            self.console.ws, self.console.user
-        )
+        self.vault_list = await client.get_vaults(self.console.ws, self.console.user)
         if self.vault_list is None:
             self.options = None
         else:
@@ -695,9 +702,7 @@ class VaultWindow(Window):
         self.console.vault = await client.get_vault(
             self.console.ws, self.console.user, vault["name"]
         )
-        self.console.msgbox.info(
-            f"Selected vault: {self.console.vault.name}"
-        )
+        self.console.msgbox.info(f"Selected vault: {self.console.vault.name}")
         self.running = False
         self.console.main_menu.pos = (0, 0)
         self.console.main_menu.draw()
@@ -723,8 +728,9 @@ class SettingsWindow(Window):
     def __init__(self, console):
         super().__init__(console, "Settings")
         self.options = [
-            "1. Change master password", "2. Change email",
-            "3. Delete account"
+            "1. Change master password",
+            "2. Change email",
+            "3. Delete account",
         ]
 
     async def run(self):
@@ -751,16 +757,18 @@ class Widget:
         self.console = console
         self.title = title
         self.box_size = (
-            self.console.screen_size[0] // 2, self.console.screen_size[1] // 2
+            self.console.screen_size[0] // 2,
+            self.console.screen_size[1] // 2,
         )
         self.box = self.console.screen.subpad(
-            self.box_size[0], self.box_size[1],
-            self.console.screen_size[0] // 4, self.console.screen_size[1] // 4
+            self.box_size[0],
+            self.box_size[1],
+            self.console.screen_size[0] // 4,
+            self.console.screen_size[1] // 4,
         )
         loc = self.box.getbegyx()
         self.widget = self.box.subpad(
-            self.box_size[0] - 2, self.box_size[1] - 2,
-            loc[0] + 1, loc[1] + 1
+            self.box_size[0] - 2, self.box_size[1] - 2, loc[0] + 1, loc[1] + 1
         )
         self.size = self.widget.getmaxyx()
         self.loc = self.widget.getbegyx()
@@ -842,9 +850,7 @@ class RegisterWidget(Widget):
         self.repeat_mpass_form = InputBox(
             self, (2, 0), prompt="Repeat master password: ", secret=True
         )
-        self.input_boxes = [
-            self.email_form, self.mpass_form, self.repeat_mpass_form
-        ]
+        self.input_boxes = [self.email_form, self.mpass_form, self.repeat_mpass_form]
 
     async def run(self):
         self.running = True
@@ -906,9 +912,7 @@ class DeleteAccountWidget(Widget):
             self.console.msgbox.info("Account not deleted")
             self.clear()
             return
-        if not await client.delete_account(
-            self.console.ws, self.console.user, mpass
-        ):
+        if not await client.delete_account(self.console.ws, self.console.user, mpass):
             self.console.msgbox.error("Failed to delete account")
             self.clear()
             return
@@ -952,9 +956,7 @@ class ChangeEmailWidget(Widget):
             self.console.msgbox.error("Failed to change email")
             self.clear()
             return
-        self.console.user = await client.auth(
-            self.console.ws, new_email, mpass
-        )
+        self.console.user = await client.auth(self.console.ws, new_email, mpass)
         self.console.msgbox.info("Email changed")
         self.clear()
 
@@ -972,8 +974,9 @@ class ChangeMpassWidget(Widget):
             self, (2, 0), prompt="Repeat new master password: ", secret=True
         )
         self.input_boxes = [
-            self.old_mpass_form, self.new_mpass_form,
-            self.repeat_new_mpass_form
+            self.old_mpass_form,
+            self.new_mpass_form,
+            self.repeat_new_mpass_form,
         ]
 
     async def run(self):
@@ -1045,9 +1048,7 @@ class AddVaultWidget(Widget):
 class RenameVaultWidget(Widget):
     def __init__(self, console):
         super().__init__(console, "Rename vault")
-        self.vault_name_form = InputBox(
-            self, (0, 0), prompt="New vault name: "
-        )
+        self.vault_name_form = InputBox(self, (0, 0), prompt="New vault name: ")
         self.input_boxes = [self.vault_name_form]
 
     async def run(self, vault_name):
@@ -1080,8 +1081,10 @@ class AddServiceWidget(Widget):
         )
         self.notes_form = InputBox(self, (3, 0), prompt="Notes: ")
         self.input_boxes = [
-            self.service_form, self.username_form,
-            self.password_form, self.notes_form
+            self.service_form,
+            self.username_form,
+            self.password_form,
+            self.notes_form,
         ]
 
     def run(self):
@@ -1133,8 +1136,10 @@ class EditServiceWidget(Widget):
             self, (3, 0), prompt="Notes: ", init_str=service["notes"]
         )
         self.input_boxes = [
-            self.service_form, self.username_form,
-            self.password_form, self.notes_form
+            self.service_form,
+            self.username_form,
+            self.password_form,
+            self.notes_form,
         ]
         self.running = True
         self.draw()

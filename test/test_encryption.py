@@ -1,4 +1,5 @@
 import unittest
+
 from src import encryption
 
 
@@ -20,9 +21,7 @@ class TestEncryption(unittest.TestCase):
         password = "test_password"
         hashed_password = encryption.hash_password(password)
         self.assertTrue(encryption.verify_password(password, hashed_password))
-        self.assertFalse(encryption.verify_password(
-            "wrong_password", hashed_password)
-        )
+        self.assertFalse(encryption.verify_password("wrong_password", hashed_password))
 
     def test_generate_vault_key(self):
         key = encryption.generate_vault_key()

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-import ssl
-import websockets
-import asyncio
-import curses
 import argparse
-import pathlib
+import asyncio
 import configparser
+import curses
+import pathlib
+import ssl
+
+import websockets
+
 from src.view import console
 
 
@@ -29,22 +31,10 @@ def read_config(current_dir):
 
 def arg_parser():
     parser = argparse.ArgumentParser(description="Password Manager Client")
-    parser.add_argument(
-        "-H", "--host",
-        help="Host to connect to"
-    )
-    parser.add_argument(
-        "-p", "--port",
-        help="Port to connect to"
-    )
-    parser.add_argument(
-        "--set-host",
-        help="Set the host in the config file"
-    )
-    parser.add_argument(
-        "--set-port",
-        help="Set the port in the config file"
-    )
+    parser.add_argument("-H", "--host", help="Host to connect to")
+    parser.add_argument("-p", "--port", help="Port to connect to")
+    parser.add_argument("--set-host", help="Set the host in the config file")
+    parser.add_argument("--set-port", help="Set the port in the config file")
 
     args = parser.parse_args()
     return args

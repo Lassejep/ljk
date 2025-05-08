@@ -1,14 +1,13 @@
 import unittest
-from src import vault, encryption
+
+from src import encryption, vault
 
 
 class TestVault(unittest.TestCase):
     def setUp(self):
         self.vault_key = encryption.generate_vault_key()
         self.vault = vault.Vault("test", self.vault_key)
-        self.vault.add(
-            "test_service", "test_user", "test_password", "test_notes"
-        )
+        self.vault.add("test_service", "test_user", "test_password", "test_notes")
 
     def test_search(self):
         service = self.vault.search("test_service")[0]
@@ -76,12 +75,12 @@ class TestVault(unittest.TestCase):
             "test_service_2", "test_user_2", "test_password_2", "test_notes_2"
         )
         self.vault.add(
-            "testing_service", "testing_user",
-            "testing_password", "testing_notes"
+            "testing_service", "testing_user", "testing_password", "testing_notes"
         )
         self.vault.add(
-            "testing_service", "testing_user"
-            "testing_password", "test to see if this works"
+            "testing_service",
+            "testing_user" "testing_password",
+            "test to see if this works",
         )
         services = self.vault.search("test_service")
         self.assertEqual(len(services), 2)
