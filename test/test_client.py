@@ -6,7 +6,8 @@ import unittest
 import websockets
 
 import server
-from src import client, db, encryption
+from src.model import db, encryption
+from src.presenter import client
 
 
 class TestClient(unittest.IsolatedAsyncioTestCase):
@@ -24,7 +25,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             server.run_server("0.0.0.0", 8765, None, self.db)
         )
         self.ws = await websockets.connect(
-            "wss://localhost:8765", ssl=None, ping_interval=None
+            "ws://localhost:8765", ssl=None, ping_interval=None
         )
         self.email = "test_email"
         self.mpass = "master_pass"

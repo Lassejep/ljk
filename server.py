@@ -10,8 +10,8 @@ import ssl
 from datetime import datetime
 from os import mkdir, path
 
+from websockets import serve
 from websockets.exceptions import ConnectionClosedOK
-from websockets.server import serve
 
 from src.model import db, handlers
 
@@ -203,8 +203,9 @@ if __name__ == "__main__":
     if args.ssl_cert != "":
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_context.load_cert_chain(args.ssl_cert)
+        print("SSL enabled")
     else:
-        ssl_context = None
+        print("SSL disabled")
     timestamp = datetime.now().strftime("%Y-%m-%d")
     logging.basicConfig(
         filename=f"{args.log_dir}/{timestamp}.log",
@@ -215,10 +216,6 @@ if __name__ == "__main__":
     print(f"Listening on {args.host}:{args.port}")
     print(f"Database File: {args.database}")
     print(f"Log File: {args.log_dir}/{timestamp}.log")
-    if ssl_context is not None:
-        print("SSL enabled")
-    else:
-        print("SSL disabled")
     print("Press Ctrl+C to stop")
 
     running = True

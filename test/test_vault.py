@@ -1,6 +1,6 @@
 import unittest
 
-from src import encryption, vault
+from src.model import encryption, vault
 
 
 class TestVault(unittest.TestCase):

@@ -1,6 +1,6 @@
 import unittest
 
-from src import encryption
+from src.model import encryption
 
 
 class TestEncryption(unittest.TestCase):

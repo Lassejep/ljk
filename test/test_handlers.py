@@ -3,7 +3,7 @@ import os
 import pickle
 import unittest
 
-from src import db, handlers
+from src.model import db, handlers
 
 
 class TestHandlers(unittest.IsolatedAsyncioTestCase):

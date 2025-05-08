@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from src import db
+from src.model import db
 
 
 class TestDB(unittest.TestCase):

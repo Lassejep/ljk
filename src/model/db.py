@@ -2,7 +2,7 @@ import sqlite3
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 
 class Database:
@@ -116,7 +116,9 @@ class Database:
         except sqlite3.IntegrityError:
             raise Exception(f"Vault with name: {name} does not exist")
 
-    def get_vaults(self, uid: int) -> Dict[str, List[Union[int, int, str, str, str]]]:
+    def get_vaults(
+        self, uid: int
+    ) -> Optional[List[Dict[str, Union[int, int, str, str, str]]]]:
         self.cursor.execute("""SELECT * FROM vaults WHERE uid = ?""", (uid,))
         vaults = self.cursor.fetchall()
         if len(vaults) <= 0:
