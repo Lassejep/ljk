@@ -11,7 +11,7 @@ import websockets
 from src.view import console
 
 
-def create_config():
+def create_config() -> None:
     current_dir = pathlib.Path(__file__).parent
     config = configparser.ConfigParser()
     config["Client"] = {
@@ -23,13 +23,13 @@ def create_config():
         config.write(configfile)
 
 
-def read_config(current_dir):
+def read_config(current_dir: pathlib.Path) -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     config.read(f"{current_dir}/client.conf")
     return config
 
 
-def arg_parser():
+def arg_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Password Manager Client")
     parser.add_argument("-H", "--host", help="Host to connect to")
     parser.add_argument("-p", "--port", help="Port to connect to")
@@ -40,7 +40,9 @@ def arg_parser():
     return args
 
 
-def load_args(config, current_dir):
+def load_args(
+    config: configparser.ConfigParser, current_dir: pathlib.Path
+) -> argparse.Namespace:
     args = arg_parser()
     if args.set_host:
         config["Client"]["host"] = args.set_host
@@ -56,11 +58,11 @@ def load_args(config, current_dir):
     return args
 
 
-def start(screen, host, port):
+def start(screen: curses.window, host: str, port: int) -> None:
     asyncio.run(main(screen, host, port))
 
 
-async def main(screen, host, port):
+async def main(screen: curses.window, host: str, port: int) -> None:
     try:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_cert = ssl.get_server_certificate((host, port))

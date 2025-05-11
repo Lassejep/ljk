@@ -9,21 +9,22 @@ import pickle
 import ssl
 from datetime import datetime
 from os import mkdir, path
+from typing import cast
 
-from websockets import serve
+from websockets import ServerConnection, serve
 from websockets.exceptions import ConnectionClosedOK
 
 from src.model import db, handlers
 
 
-async def handler(ws, database):
+async def handler(ws: ServerConnection, database: db.Database) -> None:
     lhost, lport = ws.local_address
     logging.info(f"Connected to {lhost}:{lport}")
     while True:
         try:
-            msg = await ws.recv()
+            pickled_msg = cast(bytes, await ws.recv())
             rhost, rport = ws.remote_address
-            msg = pickle.loads(msg)
+            msg = pickle.loads(pickled_msg)
             logging.info(f"{rhost}:{rport} sent command {msg['command']}")
         except ConnectionClosedOK:
             logging.info(f"{rhost}:{rport} disconnected")
@@ -61,7 +62,12 @@ async def handler(ws, database):
                 await handlers.invalid_command(ws, msg, rhost, rport)
 
 
-async def db_backup(database, backup_dir, backup_interval, max_backups):
+async def db_backup(
+    database: db.Database,
+    backup_dir: pathlib.Path,
+    backup_interval: int,
+    max_backups: int,
+) -> None:
     if int(backup_interval) == 0:
         return
     while True:
@@ -80,7 +86,9 @@ async def db_backup(database, backup_dir, backup_interval, max_backups):
             logging.error(f"Backup error: {e}")
 
 
-async def run_server(host, port, ssl_context, database):
+async def run_server(
+    host: str, port: int, ssl_context: ssl.SSLContext, database: db.Database
+) -> None:
     bound_handler = functools.partial(handler, database=database)
     async with serve(
         bound_handler,
@@ -93,7 +101,7 @@ async def run_server(host, port, ssl_context, database):
         await asyncio.Future()
 
 
-def create_config():
+def create_config() -> None:
     config = configparser.ConfigParser()
     current_dir = pathlib.Path(__file__).parent
     config["server"] = {
@@ -110,13 +118,13 @@ def create_config():
         config.write(configfile)
 
 
-def load_config(current_dir):
+def load_config(current_dir: pathlib.Path) -> configparser.ConfigParser:
     config = configparser.ConfigParser()
     config.read(f"{current_dir}/server.conf")
     return config
 
 
-def arg_parser():
+def arg_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Password Manager Server")
     parser.add_argument(
         "-H", "--host", metavar="HOST", help="Set the host to listen on"
@@ -156,7 +164,7 @@ def arg_parser():
     return args
 
 
-def load_args(config):
+def load_args(config: configparser.ConfigParser) -> argparse.Namespace:
     args = arg_parser()
     if not args.database:
         args.database = config["server"]["database"]
@@ -177,8 +185,16 @@ def load_args(config):
     return args
 
 
-def main(host, port, ssl_context, db_path, backup_dir, backup_interval, max_backups):
-    database = db.Database(db_path)
+def main(
+    host: str,
+    port: int,
+    db_path: pathlib.Path,
+    backup_dir: pathlib.Path,
+    backup_interval: int,
+    max_backups: int,
+    ssl_context: ssl.SSLContext,
+) -> None:
+    database = db.Database(db_path.as_uri())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     tasks = [
@@ -224,11 +240,11 @@ if __name__ == "__main__":
             main(
                 args.host,
                 args.port,
-                ssl_context,
                 args.database,
                 args.backup_dir,
                 args.backup_interval,
                 args.max_backups,
+                ssl_context,
             )
         except KeyboardInterrupt:
             print("Stopping server")
