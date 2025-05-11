@@ -125,7 +125,7 @@ async def get_vaults(
 
 async def get_vault(
     websocket: ClientConnection, user: Dict[str, Any], vault_name: str
-) -> Optional[Dict[str, Any]]:
+) -> Optional[Vault]:
     msg = pickle.dumps(
         {"command": "get_vault", "uid": user["id"], "vault_name": vault_name}
     )

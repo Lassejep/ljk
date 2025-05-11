@@ -1,14 +1,17 @@
 import curses
 import re
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pyperclip
+from websockets import ClientConnection
 
 from src.model.encryption import generate_password
+from src.model.vault import Vault
 from src.presenter import client
 
 
 class Console:
-    def __init__(self, ws, screen):
+    def __init__(self, ws: ClientConnection, screen: curses.window) -> None:
         self.ws = ws
         self.screen = screen
         self.screen_size = screen.getmaxyx()
@@ -27,8 +30,8 @@ class Console:
         self.hl_color = curses.color_pair(2)
         self.error_color = curses.color_pair(4)
 
-        self.user = None
-        self.vault = None
+        self.user: Optional[Dict[str, Any]] = None
+        self.vault: Optional[Vault] = None
 
         self.msgbox = MessageBox(self)
         self.start_menu = StartMenu(self)
@@ -47,7 +50,7 @@ class Console:
         self.add_service = AddServiceWidget(self)
         self.edit_service = EditServiceWidget(self)
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         while self.running:
             if self.user is None:
@@ -56,10 +59,10 @@ class Console:
             else:
                 self.start_menu.menu.erase()
                 await self.main_menu.run()
-        if self.vault is not None:
+        if self.vault is not None and self.user is not None:
             await client.save_vault(self.ws, self.user, self.vault)
 
-    def escape(self, key):
+    def escape(self, key: str) -> bool:
         try:
             if ord(key) == 27:
                 return True
@@ -67,10 +70,10 @@ class Console:
             pass
         return False
 
-    def center(self, size, text):
+    def center(self, size: Tuple[int, int], text: str) -> int:
         return (size[1] - len(text)) // 2
 
-    async def start_select(self):
+    async def start_select(self) -> None:
         if self.start_menu.pos[0] == 0:
             self.user = await self.login.run()
         if self.start_menu.pos[0] == 1:
@@ -78,7 +81,7 @@ class Console:
         if self.start_menu.pos[0] == 2:
             self.running = False
 
-    async def main_select(self):
+    async def main_select(self) -> None:
         if self.main_menu.pos[0] == 0:
             await self.services_window.run()
         if self.main_menu.pos[0] == 1:
@@ -86,7 +89,7 @@ class Console:
         if self.main_menu.pos[0] == 2:
             await self.settings_window.run()
         if self.main_menu.pos[0] == 3:
-            self.user = None
+            self.user = {}
             self.vault = None
             self.main_menu.pos = (0, 0)
             self.main_menu.running = False
@@ -95,8 +98,64 @@ class Console:
             self.running = False
 
 
+class Widget:
+    def __init__(self, console: Console, title: str) -> None:
+        self.console = console
+        self.title = title
+        self.box_size = (
+            self.console.screen_size[0] // 2,
+            self.console.screen_size[1] // 2,
+        )
+        self.box = self.console.screen.subpad(
+            self.box_size[0],
+            self.box_size[1],
+            self.console.screen_size[0] // 4,
+            self.console.screen_size[1] // 4,
+        )
+        loc = self.box.getbegyx()
+        self.widget = self.box.subpad(
+            self.box_size[0] - 2, self.box_size[1] - 2, loc[0] + 1, loc[1] + 1
+        )
+        self.size = self.widget.getmaxyx()
+        self.loc = self.widget.getbegyx()
+        self.widget.keypad(True)
+        self.input_boxes: List[InputBox] = []
+
+    def draw(self) -> None:
+        self.draw_box()
+        self.widget.erase()
+        if self.input_boxes is not None:
+            for input_box in self.input_boxes:
+                input_box.draw_prompt()
+        self.widget.refresh()
+        if self.input_boxes is not None:
+            for input_box in self.input_boxes:
+                input_box.draw()
+
+    def draw_box(self) -> None:
+        self.box.box()
+        self.box.addstr(0, 1, self.title)
+        self.box.refresh()
+
+    def clear(self) -> None:
+        self.box.erase()
+        self.box.refresh()
+        if self.input_boxes is not None:
+            for input_box in self.input_boxes:
+                input_box.clear()
+        self.widget.erase()
+        self.widget.refresh()
+
+
 class InputBox:
-    def __init__(self, widget, loc, secret=False, init_str="", prompt=""):
+    def __init__(
+        self,
+        widget: Widget,
+        loc: Tuple[int, int],
+        secret: bool = False,
+        init_str: str = "",
+        prompt: str = "",
+    ) -> None:
         self.widget = widget
         self.prompt = prompt
         self.secret = secret
@@ -114,9 +173,9 @@ class InputBox:
         self.text_field = curses.newpad(1, 999)
         self.text_field.keypad(True)
         self.secret_color = self.widget.console.background_color
-        self.func = None
+        self.func: Optional[Callable] = None
 
-    def _do_action(self, key):
+    def _do_action(self, key: int) -> Optional[str]:
         curs_pos = self.text_field.getyx()
         match key:
             case 27:
@@ -199,7 +258,7 @@ class InputBox:
                     return self.gather()
         return self.gather()
 
-    def edit(self):
+    def edit(self) -> Optional[str]:
         self.running = True
         curses.curs_set(1)
         while self.running:
@@ -211,24 +270,24 @@ class InputBox:
         curses.curs_set(0)
         return out
 
-    def gather(self):
+    def gather(self) -> str:
         return self.text.strip()
 
-    def draw_prompt(self):
+    def draw_prompt(self) -> None:
         self.widget.widget.addstr(*self.loc, self.prompt)
 
-    def draw(self):
+    def draw(self) -> None:
         self.text_field.addstr(0, 0, self.text)
         self.text_field.refresh(*self.view_loc)
 
-    def clear(self):
+    def clear(self) -> None:
         self.text = ""
         self.text_field.erase()
         self.text_field.refresh(*self.view_loc)
 
 
-class MessageBox:
-    def __init__(self, console):
+class MessageBox(Widget):
+    def __init__(self, console: Console) -> None:
         self.console = console
         self.size = (3, self.console.screen_size[1] * 4 // 5)
         self.box = self.console.screen.subpad(
@@ -247,27 +306,27 @@ class MessageBox:
         self.title = "Messages"
         self.error_color = self.console.error_color
         self.search_box = InputBox(self, (0, 0), prompt="Search: ")
-        self.query = None
+        self.query: Optional[str] = None
 
-    def draw_box(self):
+    def draw_box(self) -> None:
         self.box.erase()
         self.box.box()
         self.box.addstr(0, 1, self.title)
         self.box.refresh()
 
-    def info(self, message):
+    def info(self, message: str) -> None:
         self.widget.erase()
         self.draw_box()
         self.widget.addstr(0, 0, f"INFO: {message}")
         self.widget.refresh()
 
-    def error(self, message):
+    def error(self, message: str) -> None:
         self.widget.erase()
         self.draw_box()
         self.widget.addstr(0, 0, f"ERROR: {message}", self.error_color)
         self.widget.refresh()
 
-    def confirm(self, message):
+    def confirm(self, message: str) -> bool:
         self.widget.erase()
         self.draw_box()
         self.widget.addstr(0, 0, f"CONFIRM: {message} [y/N]")
@@ -276,13 +335,13 @@ class MessageBox:
             return True
         return False
 
-    def clear(self):
+    def clear(self) -> None:
         self.box.erase()
         self.box.refresh()
         self.widget.erase()
         self.widget.refresh()
 
-    def search(self):
+    def search(self) -> Optional[str]:
         self.search_box.func = self.console.services_window.update_service_list
         self.widget.erase()
         self.draw_box()
@@ -297,7 +356,7 @@ class MessageBox:
 
 
 class Menu:
-    def __init__(self, console, title):
+    def __init__(self, console: Console, title: str) -> None:
         self.console = console
         self.title = title
         self.box_size = (self.console.screen_size[0], self.console.screen_size[1] // 5)
@@ -310,19 +369,20 @@ class Menu:
         self.loc = self.menu.getbegyx()
         self.menu.keypad(True)
         self.pos = (0, 0)
+        self.options: List[str] = []
 
-    def draw(self):
+    def draw(self) -> None:
         self.menu.erase()
         self.draw_box()
         self.draw_options()
         self.menu.refresh()
 
-    def draw_box(self):
+    def draw_box(self) -> None:
         self.box.box()
         self.box.addstr(0, 1, self.title)
         self.box.refresh()
 
-    def draw_options(self):
+    def draw_options(self) -> None:
         if self.options is None:
             return
         for i, option in enumerate(self.options):
@@ -331,7 +391,7 @@ class Menu:
             else:
                 self.menu.addstr(i, 0, option)
 
-    async def navigate(self):
+    async def navigate(self) -> None:
         key = self.menu.getkey()
         if key == "k" or key == "KEY_UP":
             self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
@@ -343,13 +403,16 @@ class Menu:
             self.running = False
         self.draw()
 
+    async def select(self) -> None:
+        pass
+
 
 class StartMenu(Menu):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Start Menu")
         self.options = ["1. Login", "2. Register", "3. Exit"]
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.menu.erase()
         while self.running:
@@ -357,7 +420,7 @@ class StartMenu(Menu):
             await self.navigate()
             self.menu.erase()
 
-    async def select(self):
+    async def select(self) -> None:
         self.running = False
         if self.pos[0] == 0:
             await self.console.login.run()
@@ -368,7 +431,7 @@ class StartMenu(Menu):
 
 
 class MainMenu(Menu):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, title="Main Menu")
         self.options = [
             "1. Services",
@@ -378,7 +441,7 @@ class MainMenu(Menu):
             "5. Exit",
         ]
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.menu.erase()
         curses.curs_set(0)
@@ -387,7 +450,7 @@ class MainMenu(Menu):
             await self.navigate()
             self.menu.erase()
 
-    async def select(self):
+    async def select(self) -> None:
         self.running = False
         if self.pos[0] == 0:
             if self.console.vault is None:
@@ -402,11 +465,11 @@ class MainMenu(Menu):
         if self.pos[0] == 2:
             await self.console.settings_window.run()
         if self.pos[0] == 3:
-            if self.console.vault is not None:
+            if self.console.vault is not None and self.console.user is not None:
                 await client.save_vault(
                     self.console.ws, self.console.user, self.console.vault
                 )
-            self.console.user = None
+            self.console.user = {}
             self.console.vault = None
             self.pos = (0, 0)
             self.running = False
@@ -416,7 +479,7 @@ class MainMenu(Menu):
 
 
 class Window:
-    def __init__(self, console, title):
+    def __init__(self, console: Console, title: str) -> None:
         self.console = console
         self.title = title
         self.box_size = (
@@ -436,28 +499,28 @@ class Window:
         self.size = self.window.getmaxyx()
         self.loc = self.window.getbegyx()
         self.window.keypad(True)
-        self.keybinds = None
-        self.options = None
+        self.keybinds: List[str] = []
+        self.options: List[str | Tuple] = []
         self.y_offset = 0
         self.pos = (0, 0)
 
-    def draw(self):
+    def draw(self) -> None:
         self.draw_box()
         self.draw_keybinds()
         self.draw_options()
         self.window.refresh()
 
-    def draw_box(self):
+    def draw_box(self) -> None:
         self.box.erase()
         self.box.box()
         self.box.addstr(0, 1, self.title)
         self.box.refresh()
 
-    def draw_keybinds(self):
+    def draw_keybinds(self) -> None:
         if self.keybinds is None:
             return
         linelist, remainders = self.calculate_keybinds_height()
-        padding = self.get_keybind_padding(linelist, remainders)
+        padding: List[str] = self.get_keybind_padding(linelist, remainders)
         self.y_offset = len(linelist) + 1
         for i, line in enumerate(linelist):
             x_offset = 0
@@ -469,7 +532,7 @@ class Window:
                 x_offset += len(keybind)
         self.window.hline(i + 1, 0, curses.ACS_HLINE, self.size[1])
 
-    def draw_options(self):
+    def draw_options(self) -> None:
         if self.options is None:
             return
         for i, option in enumerate(self.options):
@@ -485,7 +548,14 @@ class Window:
                     self.window, i + self.y_offset, 0, option, self.pos[0] == i
                 )
 
-    def draw_cols(self, window, y_offset, x_offset, option, selected):
+    def draw_cols(
+        self,
+        window: curses.window,
+        y_offset: int,
+        x_offset: int,
+        option: Tuple,
+        selected: bool,
+    ) -> None:
         length = self.size[1] // len(option)
         for i, col in enumerate(option):
             if len(col) > length - 2:
@@ -498,7 +568,7 @@ class Window:
                 window.vline(y_offset, x_offset + length - 1, curses.ACS_VLINE, 1)
             x_offset += length
 
-    async def navigate(self):
+    async def navigate(self) -> None:
         key = self.window.getkey()
         if key == "k" or key == "KEY_UP":
             self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
@@ -510,8 +580,8 @@ class Window:
             self.running = False
         self.draw()
 
-    def calculate_keybinds_height(self):
-        linelist = [[]]
+    def calculate_keybinds_height(self) -> Tuple[List[List[str]], List[int]]:
+        linelist: List[List[str]] = [[]]
         y_offset = 0
         x_offset = 0
         remainders = []
@@ -527,7 +597,9 @@ class Window:
         assert len(linelist) == len(remainders)
         return linelist, remainders
 
-    def get_keybind_padding(self, linelist, remainders):
+    def get_keybind_padding(
+        self, linelist: List[List[str]], remainders: List[int]
+    ) -> list[str]:
         padding = []
         for i, line in enumerate(linelist):
             pad = (remainders[i] // len(line)) // 2
@@ -535,9 +607,12 @@ class Window:
             padding.append(" " * pad)
         return padding
 
+    async def select(self) -> None:
+        pass
+
 
 class ServiceWindow(Window):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Services")
         self.keybinds = [
             "<Y> Copy password",
@@ -548,9 +623,9 @@ class ServiceWindow(Window):
             "</> Search",
             "<ESC> Main menu",
         ]
-        self.service_list = None
+        self.service_list: Optional[List[Dict[str, Any]]] = []
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.window.erase()
         self.update_service_list()
@@ -560,7 +635,9 @@ class ServiceWindow(Window):
             self.window.erase()
         self.window.refresh()
 
-    async def navigate(self):
+    async def navigate(self) -> None:
+        assert self.console.user is not None
+        assert self.console.vault is not None
         key = self.window.getkey()
         if self.console.escape(key):
             if self.console.msgbox.query is not None:
@@ -584,7 +661,7 @@ class ServiceWindow(Window):
                 self.pos = ((self.pos[0] - 1) % len(self.options), self.pos[1])
             if key == "j" or key == "KEY_DOWN":
                 self.pos = ((self.pos[0] + 1) % len(self.options), self.pos[1])
-            if key == "\n":
+            if key == "\n" and self.service_list is not None:
                 self.console.show_service.run(self.service_list[self.pos[0]])
             if key.lower() == "d":
                 self.delete_service()
@@ -592,7 +669,7 @@ class ServiceWindow(Window):
                 await client.save_vault(
                     self.console.ws, self.console.user, self.console.vault
                 )
-            if key.lower() == "e":
+            if key.lower() == "e" and self.service_list is not None:
                 self.console.edit_service.run(self.service_list[self.pos[0]])
                 self.update_service_list()
                 await client.save_vault(
@@ -602,22 +679,22 @@ class ServiceWindow(Window):
                 self.copy_password()
         self.draw()
 
-    def update_service_list(self, query=None):
+    def update_service_list(self, query: Optional[str] = None) -> None:
         if self.console.vault is None:
-            self.options = None
+            self.options = []
             return
         self.service_list = self.console.vault.services()
-        if query is not None:
+        if query is not None and self.service_list is not None:
             self.service_list = [
                 service
                 for service in self.service_list
                 if re.search(query, service["service"], re.IGNORECASE) is not None
             ]
             if self.service_list == 0:
-                self.options = None
+                self.options = []
                 return
         if self.service_list is None:
-            self.options = None
+            self.options = []
             return
         else:
             self.options = [
@@ -626,25 +703,27 @@ class ServiceWindow(Window):
             ]
         self.draw()
 
-    def delete_service(self):
-        if not self.console.msgbox.confirm(
-            "Are you sure you want to delete this service?"
-        ):
-            self.console.msgbox.info("Service not deleted")
-            return
-        service = self.service_list[self.pos[0]]
-        self.console.vault.delete(service["id"])
-        self.pos = (0, 0)
-        self.console.msgbox.info("Service deleted")
+    def delete_service(self) -> None:
+        if self.service_list is not None and self.console.vault is not None:
+            if not self.console.msgbox.confirm(
+                "Are you sure you want to delete this service?"
+            ):
+                self.console.msgbox.info("Service not deleted")
+                return
+            service = self.service_list[self.pos[0]]
+            self.console.vault.delete(service["id"])
+            self.pos = (0, 0)
+            self.console.msgbox.info("Service deleted")
 
-    def copy_password(self):
-        service = self.service_list[self.pos[0]]
-        pyperclip.copy(service["password"])
-        self.console.msgbox.info("Password copied")
+    def copy_password(self) -> None:
+        if self.service_list is not None:
+            service = self.service_list[self.pos[0]]
+            pyperclip.copy(service["password"])
+            self.console.msgbox.info("Password copied")
 
 
 class VaultWindow(Window):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Vaults")
         self.keybinds = [
             "<Enter> Select vault",
@@ -653,10 +732,10 @@ class VaultWindow(Window):
             "<R> Rename vault",
             "<ESC> Main menu",
         ]
-        self.options = None
-        self.vault_list = None
+        self.options = []
+        self.vault_list: Optional[List[Dict[str, Any]]] = None
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.window.erase()
         await self.update_vault_list()
@@ -666,7 +745,7 @@ class VaultWindow(Window):
             self.window.erase()
         self.window.refresh()
 
-    async def navigate(self):
+    async def navigate(self) -> None:
         key = self.window.getkey()
         if self.console.escape(key):
             self.running = False
@@ -683,49 +762,57 @@ class VaultWindow(Window):
             if key.lower() == "d":
                 await self.delete_vault()
             if key.lower() == "r":
-                await self.console.rename_vault.run(self.options[self.pos[0]])
-                await self.update_vault_list()
+                vault = self.options[self.pos[0]]
+                if type(vault) is str:
+                    await self.console.rename_vault.run(vault)
+                    await self.update_vault_list()
         self.draw()
 
-    async def update_vault_list(self):
-        self.vault_list = await client.get_vaults(self.console.ws, self.console.user)
-        if self.vault_list is None:
-            self.options = None
-        else:
-            self.options = [vault["name"] for vault in self.vault_list]
-        self.draw()
+    async def update_vault_list(self) -> None:
+        if self.console.user is not None:
+            self.vault_list = await client.get_vaults(
+                self.console.ws, self.console.user
+            )
+            if self.vault_list is None:
+                self.options = []
+            else:
+                self.options = [vault["name"] for vault in self.vault_list]
+            self.draw()
 
-    async def select(self):
-        if self.options is None:
+    async def select(self) -> None:
+        if self.options is None or self.vault_list is None or self.console.user is None:
             return
         vault = self.vault_list[self.pos[0]]
         self.console.vault = await client.get_vault(
             self.console.ws, self.console.user, vault["name"]
         )
-        self.console.msgbox.info(f"Selected vault: {self.console.vault.name}")
+        if self.console.vault is not None:
+            self.console.msgbox.info(f"Selected vault: {self.console.vault.name}")
         self.running = False
         self.console.main_menu.pos = (0, 0)
         self.console.main_menu.draw()
         await self.console.main_menu.select()
 
-    async def delete_vault(self):
+    async def delete_vault(self) -> None:
+        assert self.console.user is not None
         if not self.console.msgbox.confirm(
             "Are you sure you want to delete this vault?"
         ):
             self.console.msgbox.info("Vault not deleted")
             return
         vault_name = self.options[self.pos[0]]
-        if not await client.delete_vault(
-            self.console.ws, self.console.user, vault_name
-        ):
-            self.console.msgbox.error("Failed to delete vault")
-        await self.update_vault_list()
-        self.pos = (0, 0)
-        self.console.msgbox.info("Vault deleted")
+        if type(vault_name) is str:
+            if not await client.delete_vault(
+                self.console.ws, self.console.user, vault_name
+            ):
+                self.console.msgbox.error("Failed to delete vault")
+            await self.update_vault_list()
+            self.pos = (0, 0)
+            self.console.msgbox.info("Vault deleted")
 
 
 class SettingsWindow(Window):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Settings")
         self.options = [
             "1. Change master password",
@@ -733,7 +820,7 @@ class SettingsWindow(Window):
             "3. Delete account",
         ]
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.window.erase()
         while self.running:
@@ -742,7 +829,7 @@ class SettingsWindow(Window):
             self.window.erase()
         self.window.refresh()
 
-    async def select(self):
+    async def select(self) -> None:
         self.running = False
         if self.pos[0] == 0:
             await self.console.change_mpass.run()
@@ -752,57 +839,8 @@ class SettingsWindow(Window):
             await self.console.delete_account.run()
 
 
-class Widget:
-    def __init__(self, console, title):
-        self.console = console
-        self.title = title
-        self.box_size = (
-            self.console.screen_size[0] // 2,
-            self.console.screen_size[1] // 2,
-        )
-        self.box = self.console.screen.subpad(
-            self.box_size[0],
-            self.box_size[1],
-            self.console.screen_size[0] // 4,
-            self.console.screen_size[1] // 4,
-        )
-        loc = self.box.getbegyx()
-        self.widget = self.box.subpad(
-            self.box_size[0] - 2, self.box_size[1] - 2, loc[0] + 1, loc[1] + 1
-        )
-        self.size = self.widget.getmaxyx()
-        self.loc = self.widget.getbegyx()
-        self.widget.keypad(True)
-        self.input_boxes = None
-
-    def draw(self):
-        self.draw_box()
-        self.widget.erase()
-        if self.input_boxes is not None:
-            for input_box in self.input_boxes:
-                input_box.draw_prompt()
-        self.widget.refresh()
-        if self.input_boxes is not None:
-            for input_box in self.input_boxes:
-                input_box.draw()
-
-    def draw_box(self):
-        self.box.box()
-        self.box.addstr(0, 1, self.title)
-        self.box.refresh()
-
-    def clear(self):
-        self.box.erase()
-        self.box.refresh()
-        if self.input_boxes is not None:
-            for input_box in self.input_boxes:
-                input_box.clear()
-        self.widget.erase()
-        self.widget.refresh()
-
-
 class LoginWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Login")
         self.console = console
         self.email_form = InputBox(self, (0, 0), prompt="Email: ")
@@ -811,7 +849,7 @@ class LoginWidget(Widget):
         )
         self.input_boxes = [self.email_form, self.mpass_form]
 
-    async def run(self):
+    async def run(self) -> Optional[Dict[str, Any]]:
         self.running = True
         self.draw()
         email = self.email_form.edit()
@@ -837,11 +875,11 @@ class LoginWidget(Widget):
             return None
         self.console.msgbox.info("Logged in")
         self.clear()
-        self.console.user = user
+        return user
 
 
 class RegisterWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Register")
         self.email_form = InputBox(self, (0, 0), prompt="Email: ")
         self.mpass_form = InputBox(
@@ -852,7 +890,7 @@ class RegisterWidget(Widget):
         )
         self.input_boxes = [self.email_form, self.mpass_form, self.repeat_mpass_form]
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.draw()
         email = self.email_form.edit()
@@ -888,14 +926,14 @@ class RegisterWidget(Widget):
 
 
 class DeleteAccountWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Delete account")
         self.mpass_form = InputBox(
             self, (0, 0), prompt="Master password: ", secret=True
         )
         self.input_boxes = [self.mpass_form]
 
-    async def run(self):
+    async def run(self) -> None:
         self.running = True
         self.draw()
         mpass = self.mpass_form.edit()
@@ -906,7 +944,7 @@ class DeleteAccountWidget(Widget):
             self.console.msgbox.error("Must be at least 8 characters long")
             self.clear()
             return
-        if not self.console.msgbox.confirm(
+        if self.console.user is None or not self.console.msgbox.confirm(
             "Are you sure you want to delete your account?"
         ):
             self.console.msgbox.info("Account not deleted")
@@ -919,11 +957,11 @@ class DeleteAccountWidget(Widget):
         self.console.msgbox.info("Account deleted")
         self.clear()
         self.console.vault = None
-        self.console.user = None
+        self.console.user = {}
 
 
 class ChangeEmailWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Change email")
         self.email_form = InputBox(self, (0, 0), prompt="New email: ")
         self.mpass_form = InputBox(
@@ -931,7 +969,8 @@ class ChangeEmailWidget(Widget):
         )
         self.input_boxes = [self.email_form, self.mpass_form]
 
-    async def run(self):
+    async def run(self) -> None:
+        assert self.console.user is not None
         self.running = True
         self.draw()
         new_email = self.email_form.edit()
@@ -962,7 +1001,7 @@ class ChangeEmailWidget(Widget):
 
 
 class ChangeMpassWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Change master password")
         self.old_mpass_form = InputBox(
             self, (0, 0), prompt="Old master password: ", secret=True
@@ -979,7 +1018,8 @@ class ChangeMpassWidget(Widget):
             self.repeat_new_mpass_form,
         ]
 
-    async def run(self):
+    async def run(self) -> None:
+        assert self.console.user is not None
         self.running = True
         self.draw()
         old_mpass = self.old_mpass_form.edit()
@@ -1020,12 +1060,13 @@ class ChangeMpassWidget(Widget):
 
 
 class AddVaultWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Add vault")
         self.vault_name_form = InputBox(self, (0, 0), prompt="Vault name: ")
         self.input_boxes = [self.vault_name_form]
 
-    async def run(self):
+    async def run(self) -> None:
+        assert self.console.user is not None
         self.running = True
         self.draw()
         vault_name = self.vault_name_form.edit()
@@ -1046,12 +1087,13 @@ class AddVaultWidget(Widget):
 
 
 class RenameVaultWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Rename vault")
         self.vault_name_form = InputBox(self, (0, 0), prompt="New vault name: ")
         self.input_boxes = [self.vault_name_form]
 
-    async def run(self, vault_name):
+    async def run(self, vault_name: str) -> None:
+        assert self.console.user is not None
         self.running = True
         self.draw()
         new_vault_name = self.vault_name_form.edit()
@@ -1072,7 +1114,7 @@ class RenameVaultWidget(Widget):
 
 
 class AddServiceWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Add service")
         self.service_form = InputBox(self, (0, 0), prompt="Service: ")
         self.username_form = InputBox(self, (1, 0), prompt="Username: ")
@@ -1087,7 +1129,8 @@ class AddServiceWidget(Widget):
             self.notes_form,
         ]
 
-    def run(self):
+    def run(self) -> None:
+        assert self.console.vault is not None
         self.running = True
         self.password_form.text = generate_password()
         self.draw()
@@ -1119,10 +1162,11 @@ class AddServiceWidget(Widget):
 
 
 class EditServiceWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Edit service")
 
-    def run(self, service):
+    def run(self, service: Dict[str, Any]) -> None:
+        assert self.console.vault is not None
         self.service_form = InputBox(
             self, (0, 0), prompt="Service: ", init_str=service["service"]
         )
@@ -1171,10 +1215,10 @@ class EditServiceWidget(Widget):
 
 
 class ShowServiceWidget(Widget):
-    def __init__(self, console):
+    def __init__(self, console: Console) -> None:
         super().__init__(console, "Service")
 
-    def run(self, service):
+    def run(self, service: Dict[str, Any]) -> None:
         self.running = True
         self.clear()
         self.draw_box()
@@ -1187,6 +1231,6 @@ class ShowServiceWidget(Widget):
         self.clear()
 
 
-async def run(screen, ws):
+async def run(screen: curses.window, ws: ClientConnection) -> None:
     app = Console(ws, screen)
     await app.run()
