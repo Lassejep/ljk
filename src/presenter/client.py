@@ -1,29 +1,34 @@
 import pickle
+from typing import Any, Dict, List, Optional, cast
+
+from websockets import ClientConnection
 
 from src.model import encryption
 from src.model.vault import Vault
 
 
-async def register(websocket, email, mpass):
+async def register(websocket: ClientConnection, email: str, mpass: str) -> bool:
     command = "register"
     dkey = encryption.create_dkey(mpass, email)
     mkey = encryption.create_mkey(mpass, dkey)
     user = {"email": email, "mkey": mkey}
     msg = pickle.dumps({"command": command, "user": user})
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def auth(websocket, email, mpass):
+async def auth(
+    websocket: ClientConnection, email: str, mpass: str
+) -> Optional[Dict[str, Any]]:
     dkey = encryption.create_dkey(mpass, email)
     mkey = encryption.create_mkey(mpass, dkey)
     msg = pickle.dumps({"command": "auth", "email": email, "mkey": mkey})
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         user = response["user"]
         user["dkey"] = dkey
@@ -32,20 +37,24 @@ async def auth(websocket, email, mpass):
         return None
 
 
-async def delete_account(websocket, user, mpass):
+async def delete_account(
+    websocket: ClientConnection, user: Dict[str, Any], mpass: str
+) -> bool:
     command = "delete_account"
     uid = user["id"]
     mkey = encryption.create_mkey(mpass, user["dkey"])
     msg = pickle.dumps({"command": command, "uid": uid, "mkey": mkey})
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def change_mkey(websocket, user, mpass, new_mpass):
+async def change_mkey(
+    websocket: ClientConnection, user: Dict[str, Any], mpass: str, new_mpass: str
+) -> bool:
     if await auth(websocket, user["email"], mpass) is None:
         return False
     vaults = await get_vaults(websocket, user)
@@ -63,14 +72,16 @@ async def change_mkey(websocket, user, mpass, new_mpass):
         {"command": "change_auth_key", "uid": user["id"], "new_mkey": new_mkey}
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def change_email(websocket, user, new_email, mpass):
+async def change_email(
+    websocket: ClientConnection, user: Dict[str, Any], new_email: str, mpass: str
+) -> bool:
     if await auth(websocket, user["email"], mpass) is None:
         return False
     new_dkey = encryption.create_dkey(mpass, new_email)
@@ -93,29 +104,33 @@ async def change_email(websocket, user, new_email, mpass):
         }
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def get_vaults(websocket, user):
+async def get_vaults(
+    websocket: ClientConnection, user: Dict[str, Any]
+) -> Optional[List[Dict[str, Any]]]:
     msg = pickle.dumps({"command": "get_vaults", "uid": user["id"]})
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "failed" or response["vaults"] is None:
         return None
     vaults = response["vaults"]
     return vaults
 
 
-async def get_vault(websocket, user, vault_name):
+async def get_vault(
+    websocket: ClientConnection, user: Dict[str, Any], vault_name: str
+) -> Optional[Dict[str, Any]]:
     msg = pickle.dumps(
         {"command": "get_vault", "uid": user["id"], "vault_name": vault_name}
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "failed":
         return None
     vault = response["vault"]
@@ -126,7 +141,9 @@ async def get_vault(websocket, user, vault_name):
     return vault
 
 
-async def save_vault(websocket, user, vault):
+async def save_vault(
+    websocket: ClientConnection, user: Dict[str, Any], vault: Vault
+) -> bool:
     vault_data = vault.dump()
     e_vault = encryption.encrypt(vault_data, vault.key)
     msg = pickle.dumps(
@@ -139,14 +156,16 @@ async def save_vault(websocket, user, vault):
     )
     vault.load(vault_data)
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def update_vault_key(websocket, user, vault_name, e_vkey):
+async def update_vault_key(
+    websocket: ClientConnection, user: Dict[str, Any], vault_name: str, e_vkey: bytes
+) -> bool:
     msg = pickle.dumps(
         {
             "command": "update_vault_key",
@@ -156,14 +175,19 @@ async def update_vault_key(websocket, user, vault_name, e_vkey):
         }
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def update_vault_name(websocket, user, vault_name, new_vault_name):
+async def update_vault_name(
+    websocket: ClientConnection,
+    user: Dict[str, Any],
+    vault_name: str,
+    new_vault_name: str,
+) -> bool:
     msg = pickle.dumps(
         {
             "command": "update_vault_name",
@@ -173,26 +197,30 @@ async def update_vault_name(websocket, user, vault_name, new_vault_name):
         }
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def delete_vault(websocket, user, vault_name):
+async def delete_vault(
+    websocket: ClientConnection, user: Dict[str, Any], vault_name: str
+) -> bool:
     msg = pickle.dumps(
         {"command": "delete_vault", "uid": user["id"], "vault_name": vault_name}
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:
         return False
 
 
-async def create_vault(websocket, user, vault_name):
+async def create_vault(
+    websocket: ClientConnection, user: Dict[str, Any], vault_name: str
+) -> bool:
     vkey = encryption.generate_vault_key()
     vault = Vault(vault_name, vkey)
     e_vkey = encryption.encrypt(vkey, user["dkey"])
@@ -207,7 +235,7 @@ async def create_vault(websocket, user, vault_name):
         }
     )
     await websocket.send(msg)
-    response = pickle.loads(await websocket.recv())
+    response = pickle.loads(cast(bytes, await websocket.recv()))
     if response["status"] == "success":
         return True
     else:

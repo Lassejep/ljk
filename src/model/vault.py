@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Optional
 
 
 class Vault:
-    def __init__(self, name: str, key: str) -> None:
+    def __init__(self, name: str, key: bytes) -> None:
         self.name: str = name
-        self.key: str = key
+        self.key: bytes = key
         self.connection: sqlite3.Connection = sqlite3.connect(":memory:")
         self.cursor: sqlite3.Cursor = self.connection.cursor()
         self.cursor.execute(
