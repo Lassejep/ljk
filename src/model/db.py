@@ -153,15 +153,15 @@ class Database:
 
     def get_vault_key(self, uid: int, name: str) -> str:
         vault = self.get_vault(uid, name)
-        return vault["key"]
+        return str(vault["key"])
 
     def get_vault_data(self, uid: int, name: str) -> str:
         vault = self.get_vault(uid, name)
-        return vault["data"]
+        return str(vault["data"])
 
     def get_vault_id(self, uid: int, name: str) -> int:
         vault = self.get_vault(uid, name)
-        return vault["id"]
+        return int(vault["id"])
 
     def update_vault_name(self, uid: int, name: str, new_name: str) -> None:
         if new_name.strip() == "":
@@ -203,7 +203,7 @@ class Database:
     async def backup(self, backup_dir: Path) -> Path:
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            backup_name = f"{backup_dir}/backup_{timestamp}.db"
+            backup_name = Path(f"{backup_dir}/backup_{timestamp}.db")
             backup_conn = sqlite3.connect(backup_name)
             self.connection.backup(backup_conn)
             backup_conn.commit()

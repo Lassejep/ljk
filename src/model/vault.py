@@ -1,12 +1,13 @@
 import sqlite3
+from typing import Any, Dict, List, Optional
 
 
 class Vault:
-    def __init__(self, name, key):
-        self.name = name
-        self.key = key
-        self.connection = sqlite3.connect(":memory:")
-        self.cursor = self.connection.cursor()
+    def __init__(self, name: str, key: str) -> None:
+        self.name: str = name
+        self.key: str = key
+        self.connection: sqlite3.Connection = sqlite3.connect(":memory:")
+        self.cursor: sqlite3.Cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS vault(
                 id INTEGER PRIMARY KEY,
@@ -17,24 +18,26 @@ class Vault:
             )"""
         )
 
-    def commit(self):
+    def commit(self) -> None:
         self.connection.commit()
 
-    def rollback(self):
+    def rollback(self) -> None:
         self.connection.rollback()
 
-    def rm(self):
+    def rm(self) -> None:
         self.cursor.close()
         self.connection.close()
 
-    def dump(self):
+    def dump(self) -> bytes:
         self.connection.commit()
         return self.connection.serialize()
 
-    def load(self, data):
+    def load(self, data: bytes) -> None:
         self.connection.deserialize(data)
 
-    def add(self, service="", user="", password="", notes=""):
+    def add(
+        self, service: str = "", user: str = "", password: str = "", notes: str = ""
+    ) -> None:
         self.cursor.execute(
             """INSERT INTO vault(
                 service, user, password, notes
@@ -42,7 +45,7 @@ class Vault:
             (service, user, password, notes),
         )
 
-    def service(self, id):
+    def service(self, id: int) -> Optional[Dict[str, Any]]:
         self.cursor.execute("""SELECT * FROM vault WHERE id = ?""", (id,))
         service = self.cursor.fetchone()
         if not service:
@@ -55,10 +58,12 @@ class Vault:
             "notes": service[4],
         }
 
-    def delete(self, id):
+    def delete(self, id: int) -> None:
         self.cursor.execute("""DELETE FROM vault WHERE id = ?""", (id,))
 
-    def update(self, id, service, user, password, notes=""):
+    def update(
+        self, id: int, service: str, user: str, password: str, notes: str = ""
+    ) -> None:
         self.cursor.execute(
             """UPDATE vault SET
                 service = ?,
@@ -69,7 +74,7 @@ class Vault:
             (service, user, password, notes, id),
         )
 
-    def services(self):
+    def services(self) -> Optional[List[Dict[str, Any]]]:
         self.cursor.execute("""SELECT * FROM vault""")
         services = self.cursor.fetchall()
         services_list = []
@@ -87,7 +92,7 @@ class Vault:
             )
         return services_list
 
-    def search(self, service):
+    def search(self, service: str) -> Optional[List[Dict[str, Any]]]:
         service = f"%{service}%"
         self.cursor.execute(
             """SELECT * FROM vault WHERE service LIKE ? OR notes LIKE ?""",
