@@ -1,8 +1,11 @@
 import logging
 import os
+import pickle
 import unittest
 from typing import Any, Dict
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
+
+from websockets import ClientConnection
 
 from src.model import db, handlers
 
@@ -18,7 +21,18 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         )
         self.rhost = "test_host"
         self.rport = 1234
-        self.ws = MagicMock()
+
+        self.ws = AsyncMock(spec=ClientConnection)
+
+        async def send_side_effect(message: bytes) -> None:
+            self.ws.message = message
+
+        self.ws.send.side_effect = send_side_effect
+
+        async def recv_side_effect() -> dict:
+            return pickle.loads(self.ws.message)
+
+        self.ws.recv.side_effect = recv_side_effect
 
     async def asyncTearDown(self) -> None:
         self.db.close()

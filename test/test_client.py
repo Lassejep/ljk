@@ -159,8 +159,6 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             self.fail("user is none")
         await client.delete_account(self.ws, user, self.mpass)
         user = await client.auth(self.ws, self.email, self.mpass)
-        if user is None:
-            self.fail("user is none")
         self.assertIsNone(user)
 
     async def test_update_vault_key(self) -> None:

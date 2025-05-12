@@ -9,7 +9,7 @@ import pickle
 import ssl
 from datetime import datetime
 from os import mkdir, path
-from typing import cast
+from typing import Optional, cast
 
 from websockets import ServerConnection, serve
 from websockets.exceptions import ConnectionClosedOK
@@ -87,7 +87,7 @@ async def db_backup(
 
 
 async def run_server(
-    host: str, port: int, ssl_context: ssl.SSLContext, database: db.Database
+    host: str, port: int, ssl_context: Optional[ssl.SSLContext], database: db.Database
 ) -> None:
     bound_handler = functools.partial(handler, database=database)
     async with serve(
