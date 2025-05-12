@@ -71,7 +71,7 @@ async def main(screen: curses.window, host: str, port: int) -> None:
         ssl_context = None
 
     async with websockets.connect(
-        f"wss://{host}:{port}", ping_interval=None, ssl=ssl_context
+        f"ws://{host}:{port}", ping_interval=None, ssl=ssl_context
     ) as websocket:
         await console.run(screen, websocket)
 

@@ -6,8 +6,8 @@ from typing import Dict, List, Optional, Union
 
 
 class Database:
-    def __init__(self, database_name: str) -> None:
-        self.database_name: str = database_name
+    def __init__(self, database_path: Path) -> None:
+        self.database_name: Path = database_path
         self.connection: sqlite3.Connection = sqlite3.connect(self.database_name)
         self.cursor: sqlite3.Cursor = self.connection.cursor()
         self.cursor.execute(

@@ -192,9 +192,9 @@ def main(
     backup_dir: pathlib.Path,
     backup_interval: int,
     max_backups: int,
-    ssl_context: ssl.SSLContext,
+    ssl_context: Optional[ssl.SSLContext],
 ) -> None:
-    database = db.Database(db_path.as_uri())
+    database = db.Database(db_path)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     tasks = [
@@ -216,6 +216,7 @@ if __name__ == "__main__":
         mkdir(args.log_dir)
     if not path.exists(args.backup_dir):
         mkdir(args.backup_dir)
+    ssl_context: Optional[ssl.SSLContext] = None
     if args.ssl_cert != "":
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_context.load_cert_chain(args.ssl_cert)
@@ -240,7 +241,7 @@ if __name__ == "__main__":
             main(
                 args.host,
                 args.port,
-                args.database,
+                pathlib.Path(args.database),
                 args.backup_dir,
                 args.backup_interval,
                 args.max_backups,
