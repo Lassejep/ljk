@@ -1,13 +1,14 @@
 import logging
 import os
-import pickle
 import unittest
+from typing import Any, Dict
+from unittest.mock import MagicMock
 
 from src.model import db, handlers
 
 
 class TestHandlers(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
+    async def asyncSetUp(self) -> None:
         self.db_path = "test.db"
         self.db = db.Database(self.db_path)
         logging.basicConfig(
@@ -16,14 +17,14 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
         self.rhost = "test_host"
-        self.rport = "test_port"
-        self.ws = MockServer()
+        self.rport = 1234
+        self.ws = MagicMock()
 
-    async def asyncTearDown(self):
+    async def asyncTearDown(self) -> None:
         self.db.close()
         os.remove(self.db_path)
 
-    async def test_register_user(self):
+    async def test_register_user(self) -> None:
         message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
         await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
         response = await self.ws.recv()
@@ -32,9 +33,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "failed", response)
 
-    async def test_auth(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_auth(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {"email": "test_email", "mkey": "test_master_key"}
         await handlers.auth(self.ws, message, self.db, self.rhost, self.rport)
@@ -45,18 +48,22 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "failed", response)
 
-    async def test_change_email(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_change_email(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {"uid": 1, "new_email": "new_email", "new_mkey": "new_master_key"}
         await handlers.change_email(self.ws, message, self.db, self.rhost, self.rport)
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
 
-    async def test_change_auth_key(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_change_auth_key(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {"uid": 1, "new_mkey": "new_master_key"}
         await handlers.change_auth_key(
@@ -65,11 +72,13 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
 
-    async def test_get_vaults(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_get_vaults(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
-        message = {"uid": 1}
+        message: Dict[str, Any] = {"uid": 1}
         await handlers.get_vaults(self.ws, message, self.db, self.rhost, self.rport)
         response = await self.ws.recv()
         self.assertEqual(response["vaults"], None, response)
@@ -93,9 +102,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["status"], "success", response)
         self.assertEqual(len(response["vaults"]), 2, response)
 
-    async def test_get_vault(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_get_vault(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {
             "uid": 1,
@@ -109,9 +120,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
 
-    async def test_create_vault(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_create_vault(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {
             "uid": 1,
@@ -123,9 +136,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
 
-    async def test_update_vault_key(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_update_vault_key(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {
             "uid": 1,
@@ -141,9 +156,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
 
-    async def test_delete_vault(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_delete_vault(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {
             "uid": 1,
@@ -158,13 +175,13 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["status"], "success", response)
         self.assertRaises(Exception, self.db.get_vault, 1, "test_vault")
 
-    async def test_invalid_command(self):
+    async def test_invalid_command(self) -> None:
         message = {"command": "invalid_command"}
         await handlers.invalid_command(self.ws, message, self.rhost, self.rport)
         response = await self.ws.recv()
         self.assertEqual(response["status"], "failed", response)
 
-    async def test_save_vault(self):
+    async def test_save_vault(self) -> None:
         message = {
             "uid": 1,
             "vault_name": "test_vault",
@@ -185,9 +202,11 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(vault["name"], "test_vault")
         self.assertEqual(vault["data"], "test_data and more data")
 
-    async def test_delete_account(self):
-        message = {"user": {"email": "test_email", "mkey": "test_master_key"}}
-        await handlers.register_user(self.ws, message, self.db, self.rhost, self.rport)
+    async def test_delete_account(self) -> None:
+        registration_msg = {"user": {"email": "test_email", "mkey": "test_master_key"}}
+        await handlers.register_user(
+            self.ws, registration_msg, self.db, self.rhost, self.rport
+        )
 
         message = {"uid": 1, "mkey": "test_master_key"}
         await handlers.delete_account(self.ws, message, self.db, self.rhost, self.rport)
@@ -195,7 +214,7 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["status"], "success", response)
         self.assertRaises(Exception, self.db.get_id, "test_email")
 
-    async def test_update_vault_name(self):
+    async def test_update_vault_name(self) -> None:
         message = {
             "uid": 1,
             "vault_name": "test_vault",
@@ -214,17 +233,3 @@ class TestHandlers(unittest.IsolatedAsyncioTestCase):
         response = await self.ws.recv()
         self.assertEqual(response["status"], "success", response)
         self.assertRaises(Exception, self.db.get_vault, 1, "test_vault")
-
-
-class MockServer:
-    def __init__(self):
-        self.message = None
-
-    async def send(self, message):
-        self.message = message
-
-    async def recv(self):
-        return pickle.loads(self.message)
-
-    async def close(self):
-        del self
