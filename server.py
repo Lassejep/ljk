@@ -219,7 +219,9 @@ if __name__ == "__main__":
     ssl_context: Optional[ssl.SSLContext] = None
     if args.ssl_cert != "":
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(args.ssl_cert)
+        ssl_context.load_cert_chain(
+            args.ssl_cert, keyfile=pathlib.Path("./certs/server.key")
+        )
         print("SSL enabled")
     else:
         print("SSL disabled")

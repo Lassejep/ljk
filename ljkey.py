@@ -67,11 +67,14 @@ async def main(screen: curses.window, host: str, port: int) -> None:
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_cert = ssl.get_server_certificate((host, port))
         ssl_context.load_verify_locations(cadata=ssl_cert)
+        ssl_context.check_hostname = False
+        uri = f"wss://{host}:{port}"
     except ssl.SSLError:
         ssl_context = None
+        uri = f"ws://{host}:{port}"
 
     async with websockets.connect(
-        f"ws://{host}:{port}", ping_interval=None, ssl=ssl_context
+        uri, ping_interval=None, ssl=ssl_context
     ) as websocket:
         await console.run(screen, websocket)
 
