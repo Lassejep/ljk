@@ -17,7 +17,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         self.db_path = "test.db"
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
-        self.db = db.Database(self.db_path)
+        self.db = db.UserDatabase(self.db_path)
         logging.basicConfig(
             filename="test.log",
             level=logging.DEBUG,

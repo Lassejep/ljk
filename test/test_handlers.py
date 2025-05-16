@@ -13,7 +13,7 @@ from src.model import db, handlers
 class TestHandlers(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.db_path = "test.db"
-        self.db = db.Database(self.db_path)
+        self.db = db.UserDatabase(self.db_path)
         logging.basicConfig(
             filename="test.log",
             level=logging.INFO,

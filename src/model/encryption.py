@@ -1,3 +1,4 @@
+import logging
 from secrets import choice, randbits
 from string import ascii_letters, digits, punctuation
 from typing import Optional
@@ -6,10 +7,8 @@ import argon2
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
-def generate_password(password_length: int = 16) -> str:
-    return "".join(
-        choice(ascii_letters + digits + punctuation) for _ in range(password_length)
-    )
+def generate_password(length: int = 16) -> str:
+    return "".join(choice(ascii_letters + digits + punctuation) for _ in range(length))
 
 
 def hash_password(password: str) -> str:
@@ -21,8 +20,11 @@ def verify_password(password: str, hash: str) -> bool:
         return argon2.PasswordHasher().verify(hash, password)
     except argon2.exceptions.VerifyMismatchError:
         return False
-    except Exception as e:
-        print(e)
+    except (
+        argon2.exceptions.VerificationError,
+        argon2.exceptions.InvalidHashError,
+    ) as err:
+        logging.log(logging.ERROR, err, stack_info=True)
         return False
 
 
@@ -40,8 +42,6 @@ def create_mkey(password: str, dkey: bytes) -> bytes:
 
 
 def create_dkey(password: str, username: str) -> bytes:
-    if len(username) < 8:
-        raise ValueError("Username must be at least 8 characters long")
     salt = username.encode()
     kdf = argon2.PasswordHasher(
         time_cost=16, memory_cost=65536, parallelism=8, hash_len=32, salt_len=len(salt)

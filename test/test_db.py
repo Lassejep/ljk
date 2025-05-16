@@ -7,7 +7,7 @@ from src.model import db
 class TestDB(unittest.TestCase):
     def setUp(self) -> None:
         self.db_file = "test.db"
-        self.db = db.Database(self.db_file)
+        self.db = db.UserDatabase(self.db_file)
         self.user_email = "test_user"
         self.user_auth_key = "test_auth_key"
 
