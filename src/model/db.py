@@ -4,11 +4,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from src.datatypes import User
 
-class Database:
-    def __init__(self, database_path: Path) -> None:
-        self.database_name: Path = database_path
-        self.connection: sqlite3.Connection = sqlite3.connect(self.database_name)
+from .exceptions import DuplicateEmailError, UserNotFoundError
+
+
+class UserDatabase:
+    def __init__(self, path: Path) -> None:
+        self.connection: sqlite3.Connection = sqlite3.connect(path)
         self.cursor: sqlite3.Cursor = self.connection.cursor()
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS users(
@@ -35,10 +38,7 @@ class Database:
     def rollback(self) -> None:
         self.connection.rollback()
 
-    def close(self) -> None:
-        self.connection.close()
-
-    def add_user(self, email: str, auth_key: str) -> None:
+    def add_user(self, email: str, auth_key: bytes) -> None:
         try:
             self.cursor.execute(
                 """INSERT INTO users(
@@ -46,34 +46,35 @@ class Database:
                 ) VALUES (?, ?)""",
                 (email, auth_key),
             )
-        except sqlite3.IntegrityError:
-            raise Exception(f"User with email: {email} already exists")
+        except sqlite3.IntegrityError as err:
+            if "UNIQUE constraint failed: users.email" in str(err):
+                raise DuplicateEmailError(email)
 
     def delete_user(self, uid: int) -> None:
         try:
             self.cursor.execute("""DELETE FROM users WHERE id = ?""", (uid,))
         except sqlite3.IntegrityError:
-            raise Exception(f"User with id: {uid} does not exist")
+            raise UserNotFoundError(uid)
 
-    def get_user(self, uid: int) -> Dict[str, Union[int, str, str]]:
+    def get_user(self, uid: int) -> User:
         self.cursor.execute("""SELECT * FROM users WHERE id = ?""", (uid,))
         user = self.cursor.fetchone()
         if user is None:
-            raise Exception(f"User with id: {uid} not found")
-        return {
-            "id": user[0],
-            "email": user[1],
-            "auth_key": user[2],
-        }
+            raise UserNotFoundError(uid)
+        return User(user[0], user[1], user[2])
 
-    def update_email(self, uid: int, new_email: str, new_auth_key: str) -> None:
+    def update_email(self, updated_user: User) -> None:
+        self.cursor.execute("""SELECT * FROM users WHERE id = ?""", (updated_user.id,))
+        if self.cursor.fetchone() is None:
+            raise UserNotFoundError(updated_user.id)
         try:
             self.cursor.execute(
                 """UPDATE users SET email = ?, auth_key = ? WHERE id = ?""",
-                (new_email, new_auth_key, uid),
+                (updated_user.email, updated_user.auth_key, updated_user.id),
             )
-        except sqlite3.IntegrityError:
-            raise Exception(f"User with email: {new_email} already exists")
+        except sqlite3.IntegrityError as err:
+            if "UNIQUE constraint failed: users.email" in str(err):
+                raise DuplicateEmailError(updated_user.email)
 
     def update_auth_key(self, uid: int, auth_key: str) -> None:
         self.get_user(uid)

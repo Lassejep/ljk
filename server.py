@@ -17,7 +17,7 @@ from websockets.exceptions import ConnectionClosedOK
 from src.model import db, handlers
 
 
-async def handler(ws: ServerConnection, database: db.Database) -> None:
+async def handler(ws: ServerConnection, database: db.UserDatabase) -> None:
     lhost, lport = ws.local_address
     logging.info(f"Connected to {lhost}:{lport}")
     while True:
@@ -63,7 +63,7 @@ async def handler(ws: ServerConnection, database: db.Database) -> None:
 
 
 async def db_backup(
-    database: db.Database,
+    database: db.UserDatabase,
     backup_dir: pathlib.Path,
     backup_interval: int,
     max_backups: int,
@@ -87,7 +87,10 @@ async def db_backup(
 
 
 async def run_server(
-    host: str, port: int, ssl_context: Optional[ssl.SSLContext], database: db.Database
+    host: str,
+    port: int,
+    ssl_context: Optional[ssl.SSLContext],
+    database: db.UserDatabase,
 ) -> None:
     bound_handler = functools.partial(handler, database=database)
     async with serve(
@@ -194,7 +197,7 @@ def main(
     max_backups: int,
     ssl_context: Optional[ssl.SSLContext],
 ) -> None:
-    database = db.Database(db_path)
+    database = db.UserDatabase(db_path)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     tasks = [
