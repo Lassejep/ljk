@@ -67,16 +67,19 @@ Once you have the client and server running, you can register a new user, login,
 
 ## Planned Features
 ### High Priority
-- [ ] GPG integration
-- [ ] Expanded password generation options
-- [ ] UI improvements
-- [ ] File encryption and storage
+- [ ] Create proper ORM for databases
+- [ ] Separate encryption layer for individual passwords (Create password_key using vault_key and data_key)
+- [ ] Proper memory management and zeroing for keys and passwords
+- [ ] UI overhaul
+- [ ] Better windows support
 - [ ] Better error handling
+- [ ] Browser extension
 
 ### Low Priority
-- [ ] Better windows support
+- [ ] Expanded password generation options
+- [ ] File encryption and storage
+- [ ] GPG integration
 - [ ] Mobile app
-- [ ] Browser extension
 
 ## How it works
 ```mermaid
